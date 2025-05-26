@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/config"
 	"gorm.io/driver/postgres"
@@ -33,6 +34,8 @@ func NewPostgresConnection(cfg config.DatabaseConfig) (*PostgresDB, error) {
 }
 
 func (p *PostgresDB) WithTenant(tenantID string) *gorm.DB {
-	schemaName := fmt.Sprintf("tenant_%s", tenantID)
+	// Sanitize tenantID to replace hyphens with underscores
+	safeTenantID := strings.ReplaceAll(tenantID, "-", "_")
+	schemaName := fmt.Sprintf("tenant_%s", safeTenantID)
 	return p.DB.Exec(fmt.Sprintf("SET search_path TO %s", schemaName))
 }

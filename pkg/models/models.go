@@ -27,7 +27,7 @@ type User struct {
 type Role struct {
 	BaseModel
 	Name        string                 `json:"name"`
-	Permissions map[string]interface{} `json:"permissions" gorm:"type:jsonb"`
+	Permissions map[string]interface{} `json:"permissions" gorm:"type:jsonb;serializer:json"`
 	Users       []User                 `json:"-" gorm:"many2many:user_roles;"`
 }
 
