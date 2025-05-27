@@ -7,6 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	if err := os.Unsetenv(key); err != nil {
+		t.Errorf("Failed to unset %s: %v", key, err)
+	}
+}
+
 func TestLoad(t *testing.T) {
 	// Set test environment variables - check errors
 	if err := os.Setenv("ENVIRONMENT", "test"); err != nil {
@@ -82,8 +89,10 @@ func TestRedisAddress(t *testing.T) {
 }
 
 func TestGetEnvString(t *testing.T) {
-	os.Setenv("TEST_STRING", "test_value")
-	defer os.Unsetenv("TEST_STRING")
+	if err := os.Setenv("TEST_STRING", "test_value"); err != nil {
+		t.Fatalf("Failed to set TEST_STRING: %v", err)
+	}
+	defer unsetEnv(t, "TEST_STRING")
 
 	value := getEnvString("TEST_STRING", "default")
 	assert.Equal(t, "test_value", value)
@@ -91,10 +100,11 @@ func TestGetEnvString(t *testing.T) {
 	value = getEnvString("NON_EXISTENT", "default")
 	assert.Equal(t, "default", value)
 }
-
 func TestGetEnvInt(t *testing.T) {
-	os.Setenv("TEST_INT", "123")
-	defer os.Unsetenv("TEST_INT")
+	if err := os.Setenv("TEST_INT", "123"); err != nil {
+		t.Fatalf("Failed to set TEST_INT: %v", err)
+	}
+	defer unsetEnv(t, "TEST_INT")
 
 	value := getEnvInt("TEST_INT", 456)
 	assert.Equal(t, 123, value)
@@ -102,9 +112,10 @@ func TestGetEnvInt(t *testing.T) {
 	value = getEnvInt("NON_EXISTENT", 456)
 	assert.Equal(t, 456, value)
 
-	// Test invalid int
-	os.Setenv("INVALID_INT", "not_a_number")
+	if err := os.Setenv("INVALID_INT", "not_a_number"); err != nil {
+		t.Fatalf("Failed to set INVALID_INT: %v", err)
+	}
+	defer unsetEnv(t, "INVALID_INT")
 	value = getEnvInt("INVALID_INT", 789)
 	assert.Equal(t, 789, value)
-	os.Unsetenv("INVALID_INT")
 }
