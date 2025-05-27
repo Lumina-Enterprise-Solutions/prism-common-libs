@@ -105,8 +105,7 @@ jobs:
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v8
       with:
-        version: latest
-        args: --timeout=5m
+        version: v2.1
 
   security:
     name: Security Scan
