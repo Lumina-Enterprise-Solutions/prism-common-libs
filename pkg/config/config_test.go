@@ -8,20 +8,40 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	// Set test environment variables
-	os.Setenv("ENVIRONMENT", "test")
-	os.Setenv("DB_HOST", "test-db")
-	os.Setenv("DB_PORT", "5432")
-	os.Setenv("REDIS_HOST", "test-redis")
-	os.Setenv("JWT_SECRET", "test-secret")
+	// Set test environment variables - check errors
+	if err := os.Setenv("ENVIRONMENT", "test"); err != nil {
+		t.Fatalf("Failed to set ENVIRONMENT: %v", err)
+	}
+	if err := os.Setenv("DB_HOST", "test-db"); err != nil {
+		t.Fatalf("Failed to set DB_HOST: %v", err)
+	}
+	if err := os.Setenv("DB_PORT", "5432"); err != nil {
+		t.Fatalf("Failed to set DB_PORT: %v", err)
+	}
+	if err := os.Setenv("REDIS_HOST", "test-redis"); err != nil {
+		t.Fatalf("Failed to set REDIS_HOST: %v", err)
+	}
+	if err := os.Setenv("JWT_SECRET", "test-secret"); err != nil {
+		t.Fatalf("Failed to set JWT_SECRET: %v", err)
+	}
 
 	defer func() {
-		// Clean up
-		os.Unsetenv("ENVIRONMENT")
-		os.Unsetenv("DB_HOST")
-		os.Unsetenv("DB_PORT")
-		os.Unsetenv("REDIS_HOST")
-		os.Unsetenv("JWT_SECRET")
+		// Clean up - check errors
+		if err := os.Unsetenv("ENVIRONMENT"); err != nil {
+			t.Errorf("Failed to unset ENVIRONMENT: %v", err)
+		}
+		if err := os.Unsetenv("DB_HOST"); err != nil {
+			t.Errorf("Failed to unset DB_HOST: %v", err)
+		}
+		if err := os.Unsetenv("DB_PORT"); err != nil {
+			t.Errorf("Failed to unset DB_PORT: %v", err)
+		}
+		if err := os.Unsetenv("REDIS_HOST"); err != nil {
+			t.Errorf("Failed to unset REDIS_HOST: %v", err)
+		}
+		if err := os.Unsetenv("JWT_SECRET"); err != nil {
+			t.Errorf("Failed to unset JWT_SECRET: %v", err)
+		}
 	}()
 
 	config, err := Load()
