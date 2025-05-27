@@ -3,7 +3,6 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/Lumina-Enterprise-Solutions/prism-common-libs)](https://goreportcard.com/report/github.com/Lumina-Enterprise-Solutions/prism-common-libs)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI/CD Pipeline](https://github.com/Lumina-Enterprise-Solutions/prism-common-libs/actions/workflows/ci.yml/badge.svg)](https://github.com/Lumina-Enterprise-Solutions/prism-common-libs/actions/workflows/ci.yml)
-[![Coverage Status](https://img.shields.io/codecov/c/github/Lumina-Enterprise-Solutions/prism-common-libs)](https://codecov.io/gh/Lumina-Enterprise-Solutions/prism-common-libs)
 [![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8.svg)](https://golang.org/dl/)
 
 `prism-common-libs` is a Go library providing common utilities and components for building scalable, multi-tenant applications with the Prism ERP system. It includes middleware, database connectivity, caching, logging, and more.
