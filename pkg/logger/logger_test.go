@@ -8,6 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	if err := os.Unsetenv(key); err != nil {
+		t.Errorf("Failed to unset %s: %v", key, err)
+	}
+}
+
 func TestLoggerInitialization(t *testing.T) {
 	assert.NotNil(t, Log)
 	assert.IsType(t, &logrus.Logger{}, Log)
@@ -15,23 +22,29 @@ func TestLoggerInitialization(t *testing.T) {
 
 func TestLogLevel(t *testing.T) {
 	// Test debug level
-	os.Setenv("LOG_LEVEL", "debug")
+	if err := os.Setenv("LOG_LEVEL", "debug"); err != nil {
+		t.Fatalf("Failed to set LOG_LEVEL to debug: %v", err)
+	}
+	defer unsetEnv(t, "LOG_LEVEL")
 	// Reinitialize logger (in real scenario, this would be done during init)
 	Log.SetLevel(logrus.DebugLevel)
 	assert.Equal(t, logrus.DebugLevel, Log.GetLevel())
 
 	// Test info level
-	os.Setenv("LOG_LEVEL", "info")
+	if err := os.Setenv("LOG_LEVEL", "info"); err != nil {
+		t.Fatalf("Failed to set LOG_LEVEL to info: %v", err)
+	}
+	defer unsetEnv(t, "LOG_LEVEL")
 	Log.SetLevel(logrus.InfoLevel)
 	assert.Equal(t, logrus.InfoLevel, Log.GetLevel())
 
 	// Test error level
-	os.Setenv("LOG_LEVEL", "error")
+	if err := os.Setenv("LOG_LEVEL", "error"); err != nil {
+		t.Fatalf("Failed to set LOG_LEVEL to error: %v", err)
+	}
+	defer unsetEnv(t, "LOG_LEVEL")
 	Log.SetLevel(logrus.ErrorLevel)
 	assert.Equal(t, logrus.ErrorLevel, Log.GetLevel())
-
-	// Clean up
-	os.Unsetenv("LOG_LEVEL")
 }
 
 func TestWithFields(t *testing.T) {
