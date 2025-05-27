@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -59,7 +60,7 @@ func (suite *IntegrationTestSuite) SetupSuite() {
 	suite.config = cfg
 
 	// Setup database
-	db, err := database.NewPostgresConnection(cfg.Database)
+	db, err := database.NewPostgresConnection(&cfg.Database)
 	require.NoError(suite.T(), err)
 	suite.db = db
 
@@ -196,19 +197,19 @@ func (suite *IntegrationTestSuite) TestFullAuthenticationFlow() {
 	})
 
 	// Test public endpoint
-	req := httptest.NewRequest("GET", "/public", nil)
+	req := httptest.NewRequest("GET", "/public", http.NoBody)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(suite.T(), 200, w.Code)
 
 	// Test protected endpoint without auth
-	req = httptest.NewRequest("GET", "/protected/user", nil)
+	req = httptest.NewRequest("GET", "/protected/user", http.NoBody)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(suite.T(), 401, w.Code)
 
 	// Test protected endpoint with invalid token
-	req = httptest.NewRequest("GET", "/protected/user", nil)
+	req = httptest.NewRequest("GET", "/protected/user", http.NoBody)
 	req.Header.Set("Authorization", "Bearer invalid-token")
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -223,7 +224,7 @@ func (suite *IntegrationTestSuite) TestFullAuthenticationFlow() {
 	tokenString, err := token.SignedString([]byte(suite.config.JWT.Secret))
 	require.NoError(suite.T(), err)
 
-	req = httptest.NewRequest("GET", "/protected/user", nil)
+	req = httptest.NewRequest("GET", "/protected/user", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
 	req.Header.Set("X-Tenant-ID", "tenant-456")
 	w = httptest.NewRecorder()
@@ -420,7 +421,7 @@ func (suite *IntegrationTestSuite) TestMiddlewareChaining() {
 		})
 	})
 
-	req := httptest.NewRequest("GET", "/test-middleware", nil)
+	req := httptest.NewRequest("GET", "/test-middleware", http.NoBody)
 	req.Header.Set("X-Tenant-ID", "test_tenant-123")
 	req.Header.Set("X-Request-ID", "custom-request-id")
 

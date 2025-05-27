@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/config"
+	configDb "github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/config"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -13,7 +13,7 @@ type RedisClient struct {
 	client *redis.Client
 }
 
-func NewRedisClient(cfg config.RedisConfig) *RedisClient {
+func NewRedisClient(cfg configDb.RedisConfig) *RedisClient {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Address(),
 		Password: cfg.Password,

@@ -6,6 +6,10 @@ import (
 	"fmt"
 )
 
+const (
+	HexDivisor = 2 // For converting length to bytes when generating hex strings
+)
+
 // GenerateRandomBytes generates random bytes of specified length
 func GenerateRandomBytes(length int) []byte {
 	bytes := make([]byte, length)
@@ -17,6 +21,6 @@ func GenerateRandomBytes(length int) []byte {
 
 // GenerateRandomString generates a random hex string
 func GenerateRandomString(length int) string {
-	bytes := GenerateRandomBytes(length / 2)
+	bytes := GenerateRandomBytes(length / HexDivisor)
 	return hex.EncodeToString(bytes)
 }

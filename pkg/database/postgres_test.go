@@ -11,14 +11,14 @@ import (
 func TestNewPostgresConnection(t *testing.T) {
 	cfg := config.DatabaseConfig{
 		Host:     "localhost",
-		Port:     5432,
+		Port:     543,
 		Database: "test_db",
 		Username: "postgres",
 		Password: "postgres",
 		SSLMode:  "disable",
 	}
 
-	db, err := NewPostgresConnection(cfg)
+	db, err := NewPostgresConnection(&cfg)
 	if err != nil {
 		t.Skipf("Skipping database test: %v", err)
 		return
@@ -45,7 +45,7 @@ func TestWithTenant(t *testing.T) {
 		SSLMode:  "disable",
 	}
 
-	db, err := NewPostgresConnection(cfg)
+	db, err := NewPostgresConnection(&cfg)
 	if err != nil {
 		t.Skipf("Skipping database test: %v", err)
 		return

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -19,7 +20,7 @@ func TestCORS(t *testing.T) {
 	})
 
 	// Test preflight request
-	req := httptest.NewRequest("OPTIONS", "/test", nil)
+	req := httptest.NewRequest("OPTIONS", "/test", http.NoBody)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -29,7 +30,7 @@ func TestCORS(t *testing.T) {
 	assert.Contains(t, w.Header().Get("Access-Control-Allow-Headers"), "Authorization")
 
 	// Test regular request
-	req = httptest.NewRequest("GET", "/test", nil)
+	req = httptest.NewRequest("GET", "/test", http.NoBody)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -47,7 +48,7 @@ func TestRequestID(t *testing.T) {
 	})
 
 	// Test without existing request ID
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -55,7 +56,7 @@ func TestRequestID(t *testing.T) {
 	assert.NotEmpty(t, w.Header().Get("X-Request-ID"))
 
 	// Test with existing request ID
-	req = httptest.NewRequest("GET", "/test", nil)
+	req = httptest.NewRequest("GET", "/test", http.NoBody)
 	req.Header.Set("X-Request-ID", "test-id-123")
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -74,7 +75,7 @@ func TestTenantMiddleware(t *testing.T) {
 	})
 
 	// Test with tenant ID
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
 	req.Header.Set("X-Tenant-ID", "tenant-123")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -94,14 +95,14 @@ func TestRequireAuth(t *testing.T) {
 	})
 
 	// Test without authorization header
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, 401, w.Code)
 
 	// Test with invalid token
-	req = httptest.NewRequest("GET", "/test", nil)
+	req = httptest.NewRequest("GET", "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer invalid-token")
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -115,7 +116,7 @@ func TestRequireAuth(t *testing.T) {
 	})
 	tokenString, _ := token.SignedString([]byte(jwtConfig.Secret))
 
-	req = httptest.NewRequest("GET", "/test", nil)
+	req = httptest.NewRequest("GET", "/test", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)

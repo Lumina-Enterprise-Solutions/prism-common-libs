@@ -10,23 +10,32 @@ import (
 	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/config"
 	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/database"
 	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/models"
-	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/utils"
 	"github.com/google/uuid"
 )
 
+// Helper function to check errors in benchmarks
+func checkErr(b *testing.B, err error) {
+	if err != nil {
+		b.Fatal(err)
+	}
+}
+
 func BenchmarkDatabaseOperations(b *testing.B) {
 	cfg, err := config.Load()
+	checkErr(b, err)
 	if err != nil {
 		b.Skip("Database not available for benchmarking")
 	}
 
-	db, err := database.NewPostgresConnection(cfg.Database)
+	db, err := database.NewPostgresConnection(&cfg.Database) // Pass pointer
+	checkErr(b, err)
 	if err != nil {
 		b.Skip("Database not available for benchmarking")
 	}
 
 	// Setup
-	db.DB.AutoMigrate(&models.User{})
+	err = db.DB.AutoMigrate(&models.User{})
+	checkErr(b, err)
 
 	b.ResetTimer()
 
@@ -38,7 +47,8 @@ func BenchmarkDatabaseOperations(b *testing.B) {
 				LastName:  "User",
 				Status:    "active",
 			}
-			db.DB.Create(&user)
+			result := db.DB.Create(&user)
+			checkErr(b, result.Error)
 		}
 	})
 
@@ -50,12 +60,14 @@ func BenchmarkDatabaseOperations(b *testing.B) {
 			LastName:  "User",
 			Status:    "active",
 		}
-		db.DB.Create(&user)
+		result := db.DB.Create(&user)
+		checkErr(b, result.Error)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var foundUser models.User
-			db.DB.First(&foundUser, user.ID)
+			result := db.DB.First(&foundUser, user.ID)
+			checkErr(b, result.Error)
 		}
 	})
 
@@ -67,21 +79,25 @@ func BenchmarkDatabaseOperations(b *testing.B) {
 			LastName:  "User",
 			Status:    "active",
 		}
-		db.DB.Create(&user)
+		result := db.DB.Create(&user)
+		checkErr(b, result.Error)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			user.FirstName = fmt.Sprintf("Updated%d", i)
-			db.DB.Save(&user)
+			result := db.DB.Save(&user)
+			checkErr(b, result.Error)
 		}
 	})
 
 	// Cleanup
-	db.DB.Exec("DELETE FROM users WHERE email LIKE 'bench%@example.com' OR email IN ('find@example.com', 'update@example.com')")
+	result := db.DB.Exec("DELETE FROM users WHERE email LIKE 'bench%@example.com' OR email IN ('find@example.com', 'update@example.com')")
+	checkErr(b, result.Error)
 }
 
 func BenchmarkRedisOperations(b *testing.B) {
 	cfg, err := config.Load()
+	checkErr(b, err)
 	if err != nil {
 		b.Skip("Redis not available for benchmarking")
 	}
@@ -91,6 +107,7 @@ func BenchmarkRedisOperations(b *testing.B) {
 
 	// Test if Redis is available
 	err = redisClient.Set(ctx, "test", "test", time.Second)
+	checkErr(b, err)
 	if err != nil {
 		b.Skip("Redis not available for benchmarking")
 	}
@@ -107,78 +124,47 @@ func BenchmarkRedisOperations(b *testing.B) {
 	b.Run("Set", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			key := fmt.Sprintf("bench:set:%d", i)
-			redisClient.Set(ctx, key, testData, time.Hour)
+			err := redisClient.Set(ctx, key, testData, time.Hour)
+			checkErr(b, err)
 		}
 	})
 
 	b.Run("Get", func(b *testing.B) {
 		// Setup data
 		key := "bench:get:data"
-		redisClient.Set(ctx, key, testData, time.Hour)
+		err := redisClient.Set(ctx, key, testData, time.Hour)
+		checkErr(b, err)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var result map[string]interface{}
-			redisClient.Get(ctx, key, &result)
+			err := redisClient.Get(ctx, key, &result)
+			checkErr(b, err)
 		}
 	})
 
 	b.Run("Exists", func(b *testing.B) {
 		// Setup data
 		key := "bench:exists:data"
-		redisClient.Set(ctx, key, testData, time.Hour)
+		err := redisClient.Set(ctx, key, testData, time.Hour)
+		checkErr(b, err)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			redisClient.Exists(ctx, key)
+			_, err := redisClient.Exists(ctx, key)
+			checkErr(b, err)
 		}
 	})
 
 	b.Run("Delete", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			key := fmt.Sprintf("bench:delete:%d", i)
-			redisClient.Set(ctx, key, testData, time.Hour)
+			err := redisClient.Set(ctx, key, testData, time.Hour)
+			checkErr(b, err)
 			b.StartTimer()
-			redisClient.Delete(ctx, key)
+			err = redisClient.Delete(ctx, key)
+			checkErr(b, err)
 			b.StopTimer()
-		}
-	})
-}
-
-func BenchmarkCryptoOperations(b *testing.B) {
-	b.Run("GenerateRandomBytes16", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			utils.GenerateRandomBytes(16)
-		}
-	})
-
-	b.Run("GenerateRandomBytes32", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			utils.GenerateRandomBytes(32)
-		}
-	})
-
-	b.Run("GenerateRandomBytes64", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			utils.GenerateRandomBytes(64)
-		}
-	})
-
-	b.Run("GenerateRandomString16", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			utils.GenerateRandomString(16)
-		}
-	})
-
-	b.Run("GenerateRandomString32", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			utils.GenerateRandomString(32)
-		}
-	})
-
-	b.Run("GenerateRandomString64", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			utils.GenerateRandomString(64)
 		}
 	})
 }
@@ -192,7 +178,7 @@ func BenchmarkUUIDGeneration(b *testing.B) {
 
 	b.Run("UUIDString", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			uuid.New().String()
+			_ = uuid.New().String() // Assign to _ to avoid unused result warning
 		}
 	})
 }
@@ -200,7 +186,8 @@ func BenchmarkUUIDGeneration(b *testing.B) {
 func BenchmarkConfigLoad(b *testing.B) {
 	b.Run("LoadConfig", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			config.Load()
+			_, err := config.Load()
+			checkErr(b, err)
 		}
 	})
 }

@@ -10,6 +10,28 @@ output:
       print-linter-name: true
 
 linters-settings:
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+        allow:
+          # Standard library is always allowed
+          - $gostd
+          # Your internal packages
+          - github.com/Lumina-Enterprise-Solutions/prism-common-libs
+          # External dependencies
+          - github.com/redis/go-redis/v9
+          - github.com/sirupsen/logrus
+          - github.com/gin-gonic/gin
+          - github.com/go-playground/validator/v10
+          - github.com/golang-jwt/jwt/v4
+          - github.com/google/uuid
+          - gorm.io/gorm
+          - gorm.io/driver/postgres
+          - gorm.io/gorm/logger
+          # Test dependencies
+          - github.com/stretchr/testify
   govet:
     enable:
       - shadow
@@ -24,8 +46,6 @@ linters-settings:
     locale: US
   lll:
     line-length: 140
-  goimports:
-    local-prefixes: github.com/Lumina-Enterprise-Solutions/prism-common-libs
   gocritic:
     enabled-tags:
       - diagnostic

@@ -11,6 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	StatusNoContent = 204 // HTTP status for OPTIONS requests
+)
+
 // CORS middleware
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -20,7 +24,7 @@ func CORS() gin.HandlerFunc {
 		c.Header("Access-Control-Expose-Headers", "X-Request-ID")
 
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+			c.AbortWithStatus(StatusNoContent)
 			return
 		}
 
@@ -64,7 +68,7 @@ func RequireAuth(jwtConfig config.JWTConfig) gin.HandlerFunc {
 
 		tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
 
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.Parse(tokenString, func(_ *jwt.Token) (interface{}, error) {
 			return []byte(jwtConfig.Secret), nil
 		})
 
