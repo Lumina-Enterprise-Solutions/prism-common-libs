@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/config"
+	configDb "github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -14,7 +14,12 @@ type PostgresDB struct {
 	DB *gorm.DB
 }
 
-func NewPostgresConnection(cfg config.DatabaseConfig) (*PostgresDB, error) {
+const (
+	DefaultMaxIdleConns = 10
+	DefaultMaxOpenConns = 100
+)
+
+func NewPostgresConnection(cfg *configDb.DatabaseConfig) (*PostgresDB, error) {
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
@@ -27,8 +32,8 @@ func NewPostgresConnection(cfg config.DatabaseConfig) (*PostgresDB, error) {
 		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
 	}
 
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxIdleConns(DefaultMaxIdleConns)
+	sqlDB.SetMaxOpenConns(DefaultMaxOpenConns)
 
 	return &PostgresDB{DB: db}, nil
 }

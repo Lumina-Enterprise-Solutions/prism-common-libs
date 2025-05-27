@@ -8,6 +8,7 @@ import (
 
 var Log *logrus.Logger
 
+//nolint:all
 func init() {
 	Log = logrus.New()
 	Log.SetOutput(os.Stdout)

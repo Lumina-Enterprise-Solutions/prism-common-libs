@@ -42,13 +42,22 @@ type Config struct {
 	Server      ServerConfig
 }
 
+const (
+	DefaultDBPort        = 5432
+	DefaultRedisPort     = 6379
+	DefaultJWTExpiration = 3600 // 1 hour in seconds
+	DefaultServerPort    = 8080
+	DefaultReadTimeout   = 10 // seconds
+	DefaultWriteTimeout  = 10 // seconds
+)
+
 func Load() (*Config, error) {
 	config := &Config{
 		Environment: getEnvString("ENVIRONMENT", "development"),
 		TenantID:    getEnvString("TENANT_ID", "default"),
 		Database: DatabaseConfig{
 			Host:     getEnvString("DB_HOST", "localhost"),
-			Port:     getEnvInt("DB_PORT", 5432),
+			Port:     getEnvInt("DB_PORT", DefaultDBPort),
 			Database: getEnvString("DB_NAME", "prism_erp"),
 			Username: getEnvString("DB_USER", "prism"),
 			Password: getEnvString("DB_PASSWORD", "prism123"),
@@ -56,25 +65,25 @@ func Load() (*Config, error) {
 		},
 		Redis: RedisConfig{
 			Host:     getEnvString("REDIS_HOST", "localhost"),
-			Port:     getEnvInt("REDIS_PORT", 6379),
+			Port:     getEnvInt("REDIS_PORT", DefaultRedisPort),
 			Password: getEnvString("REDIS_PASSWORD", "redis123"),
 			DB:       getEnvInt("REDIS_DB", 0),
 		},
 		JWT: JWTConfig{
 			Secret:         getEnvString("JWT_SECRET", "your-secret-key"),
-			ExpirationTime: getEnvInt("JWT_EXPIRATION", 3600),
+			ExpirationTime: getEnvInt("JWT_EXPIRATION", DefaultJWTExpiration),
 		},
 		Server: ServerConfig{
-			Port:         getEnvInt("SERVER_PORT", 8080),
-			ReadTimeout:  getEnvInt("SERVER_READ_TIMEOUT", 10),
-			WriteTimeout: getEnvInt("SERVER_WRITE_TIMEOUT", 10),
+			Port:         getEnvInt("SERVER_PORT", DefaultServerPort),
+			ReadTimeout:  getEnvInt("SERVER_READ_TIMEOUT", DefaultReadTimeout),
+			WriteTimeout: getEnvInt("SERVER_WRITE_TIMEOUT", DefaultWriteTimeout),
 		},
 	}
 
 	return config, nil
 }
 
-func (d DatabaseConfig) DSN() string {
+func (d *DatabaseConfig) DSN() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.Username, d.Password, d.Database, d.SSLMode)
 }
