@@ -2,9 +2,11 @@ package logger
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
+	"github.com/grafana/loki-client-go/loki"
 	"github.com/sirupsen/logrus"
 )
 
@@ -136,6 +138,13 @@ func init() {
 		Log.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: "2006-01-02T15:04:05.000Z",
 		})
+		lokiClient, err := loki.New(loki.Config{
+			URL: "http://localhost:3100/loki/api/v1/push",
+		})
+		if err != nil {
+			log.Fatal("Failed to initialize Loki client:", err)
+		}
+		Log.Hooks.Add(lokiClient)
 	} else {
 		Log.SetFormatter(&CustomFormatter{
 			TimestampFormat: "15:04:05",
