@@ -34,6 +34,14 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var levelColor string
 	var levelIcon string
 
+	// Check if it's a success message and add green color
+	if !f.NoColors {
+		if successType, exists := entry.Data["type"]; exists && successType == "success" {
+			levelColor = ColorGreen
+			levelIcon = "✅"
+		}
+	}
+
 	if !f.NoColors {
 		switch entry.Level {
 		case logrus.DebugLevel:
@@ -162,18 +170,18 @@ func init() {
 }
 
 // WithFields creates an entry with multiple fields
-func WithFields(fields logrus.Fields) *logrus.Entry {
-	return Log.WithFields(fields)
+func WithFields(fields logrus.Fields) *CustomEntry {
+	return &CustomEntry{Log.WithFields(fields)}
 }
 
 // WithField creates an entry with a single field
-func WithField(key string, value interface{}) *logrus.Entry {
-	return Log.WithField(key, value)
+func WithField(key string, value interface{}) *CustomEntry {
+	return &CustomEntry{Log.WithField(key, value)}
 }
 
 // WithError creates an entry with an error field
-func WithError(err error) *logrus.Entry {
-	return Log.WithError(err)
+func WithError(err error) *CustomEntry {
+	return &CustomEntry{Log.WithError(err)}
 }
 
 // Debug logs a debug message
@@ -226,16 +234,29 @@ func Fatalf(format string, args ...interface{}) {
 	Log.Fatalf(format, args...)
 }
 
+// CustomEntry extends logrus.Entry with additional methods
+type CustomEntry struct {
+	*logrus.Entry
+}
+
+// Success logs a success message for CustomEntry
+func (e *CustomEntry) Success(args ...interface{}) {
+	e.WithField("type", "success").Info(args...)
+}
+
+// Successf logs a formatted success message for CustomEntry
+func (e *CustomEntry) Successf(format string, args ...interface{}) {
+	e.WithField("type", "success").Infof(format, args...)
+}
+
 // Success logs a success message (using Info level with green color)
 func Success(args ...interface{}) {
-	entry := Log.WithField("type", "success")
-	entry.Info(args...)
+	Log.WithField("type", "success").Info(args...)
 }
 
 // Successf logs a formatted success message
 func Successf(format string, args ...interface{}) {
-	entry := Log.WithField("type", "success")
-	entry.Infof(format, args...)
+	Log.WithField("type", "success").Infof(format, args...)
 }
 
 // Banner prints a stylized banner message
