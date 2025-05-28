@@ -33,7 +33,7 @@ const (
 func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var levelColor string
 	var levelIcon string
-
+	
 	// Check if it's a success message and add green color
 	if !f.NoColors {
 		if successType, exists := entry.Data["type"]; exists && successType == "success" {
@@ -71,7 +71,7 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 
 	var output strings.Builder
-
+	
 	// Timestamp
 	if !f.NoColors {
 		output.WriteString(ColorGray)
@@ -80,7 +80,7 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if !f.NoColors {
 		output.WriteString(ColorReset)
 	}
-
+	
 	// Level with icon and color
 	output.WriteString(" ")
 	if !f.NoColors {
@@ -92,7 +92,7 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if !f.NoColors {
 		output.WriteString(ColorReset)
 	}
-
+	
 	// Message
 	output.WriteString(" ")
 	if !f.NoColors && entry.Level >= logrus.ErrorLevel {
@@ -102,7 +102,7 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if !f.NoColors && entry.Level >= logrus.ErrorLevel {
 		output.WriteString(ColorReset)
 	}
-
+	
 	// Fields (if any)
 	if len(entry.Data) > 0 {
 		output.WriteString(" ")
@@ -110,7 +110,7 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 			output.WriteString(ColorCyan)
 		}
 		output.WriteString("[")
-
+		
 		first := true
 		for key, value := range entry.Data {
 			if !first {
@@ -119,13 +119,13 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 			output.WriteString(fmt.Sprintf("%s=%v", key, value))
 			first = false
 		}
-
+		
 		output.WriteString("]")
 		if !f.NoColors {
 			output.WriteString(ColorReset)
 		}
 	}
-
+	
 	output.WriteString("\n")
 	return []byte(output.String()), nil
 }
@@ -134,10 +134,10 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 func init() {
 	Log = logrus.New()
 	Log.SetOutput(os.Stdout)
-
+	
 	// Check if we should disable colors (for CI/CD environments)
 	noColors := os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
-
+	
 	// Use JSON formatter in production, custom formatter in development
 	env := os.Getenv("ENVIRONMENT")
 	if env == "production" || env == "prod" {
@@ -265,8 +265,8 @@ func Banner(message string) {
 		banner := fmt.Sprintf(`
 ╔══════════════════════════════════════════════════════════════╗
 ║  %s  ║
-╚══════════════════════════════════════════════════════════════╝`,
-			padString(message, 58))
+╚══════════════════════════════════════════════════════════════╝`, 
+		padString(message, 58))
 		fmt.Println(ColorCyan + banner + ColorReset)
 	}
 }
