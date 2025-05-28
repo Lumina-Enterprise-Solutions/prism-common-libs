@@ -4,3 +4,5 @@ go.mod
 go.sum
 LICENSE
 README.md
+
+*_test.go
