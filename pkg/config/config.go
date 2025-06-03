@@ -5,9 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	// Jika Anda memisahkan consul client untuk KV
-	// "github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/consulkv"
-	consulapi "github.com/hashicorp/consul/api" // Gunakan API Consul langsung
+	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/secrets" // Import Vault client Anda
+	consulapi "github.com/hashicorp/consul/api"
 )
 
 // Variabel global untuk Consul client, diinisialisasi sekali
@@ -149,58 +148,107 @@ const (
 	DefaultWriteTimeout  = 10 // seconds
 )
 
+// Helper untuk mengambil nilai dari map konfigurasi yang dimuat dari Vault, dengan fallback
+func getStringFromMap(configMap map[string]string, key string, defaultValue string) string {
+	if val, ok := configMap[key]; ok {
+		return val
+	}
+	fmt.Printf("Warning: Key '%s' not found in Vault config map. Using default: '%s'\n", key, defaultValue)
+	return defaultValue
+}
+
+func getIntFromMap(configMap map[string]string, key string, defaultValue int) int {
+	if strVal, ok := configMap[key]; ok {
+		if intVal, err := strconv.Atoi(strVal); err == nil {
+			return intVal
+		}
+		fmt.Printf("Warning: Failed to parse int for key '%s' (value: '%s') from Vault config map. Using default: %d\n", key, strVal, defaultValue)
+	} else {
+		fmt.Printf("Warning: Key '%s' not found in Vault config map. Using default: %d\n", key, defaultValue)
+	}
+	return defaultValue
+}
+
 func Load() (*Config, error) {
-	// Inisialisasi Consul Client untuk KV di awal
-	// Alamat Consul bisa dari env atau hardcoded default untuk dev
-	consulAddrFromEnv := getEnvString("CONSUL_ADDRESS", "http://localhost:8500")
-	if err := initConsulKVClient(consulAddrFromEnv); err != nil {
-		fmt.Printf("Warning: Failed to initialize Consul KV client: %v. Configuration might not be loaded from Consul.\n", err)
-		// Anda bisa memilih untuk gagal di sini atau melanjutkan dengan env/default
+	// 1. Dapatkan VAULT_ADDR dan VAULT_TOKEN dari environment (ini adalah bootstrap vars)
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	vaultToken := os.Getenv("VAULT_TOKEN") // Atau mekanisme auth lain
+
+	if vaultAddr == "" {
+		return nil, fmt.Errorf("VAULT_ADDR environment variable not set")
+	}
+	// Untuk dev, kita bisa asumsikan VAULT_TOKEN ada. Di prod, gunakan AppRole atau auth method lain.
+	if vaultToken == "" && os.Getenv("ENVIRONMENT") == "development" { // Cek jika ENVIRONMENT diset
+		// Ini asumsi, lebih baik VAULT_TOKEN diset eksplisit
+		fmt.Println("Warning: VAULT_TOKEN not set, assuming dev mode (roottoken may or may not work depending on SDK).")
 	}
 
-	// Muat JWT Secret (Contoh penggunaan getConfigString)
-	// Path di Vault (jika digunakan) vs Path di Consul KV untuk config biasa
-	jwtSecret := getConfigString(
-		getEnvString("JWT_CONSUL_PATH", ""), // Misal: "config/jwt/secret"
-		"JWT_SECRET",
-		"your-secret-key-default-fallback",
-	)
-	// Jika Anda masih menggunakan Vault untuk JWT_SECRET, logic Vault di sini akan diutamakan
-	// Atau buat fungsi getSecret yang lebih canggih.
+	// 2. Inisialisasi Vault Client
+	// NewVaultClient() sudah diubah untuk membaca VAULT_ADDR dan VAULT_TOKEN dari env
+	vClient, err := secrets.NewVaultClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Vault client: %w", err)
+	}
 
-	config := &Config{
-		Environment: getEnvString("ENVIRONMENT", "development"),
-		TenantID:    getEnvString("TENANT_ID", "default"),
+	// 3. Tentukan path konfigurasi di Vault
+	// Ini bisa juga dari env var jika Anda ingin lebih fleksibel
+	vaultConfigPath := os.Getenv("VAULT_CONFIG_PATH")
+	if vaultConfigPath == "" {
+		vaultConfigPath = "config/prism-auth-service" // Default path
+		fmt.Printf("VAULT_CONFIG_PATH not set, using default: %s\n", vaultConfigPath)
+	}
+
+	// 4. Baca semua konfigurasi dari Vault
+	configMap, err := vClient.ReadAllSecrets(vaultConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration from Vault path '%s': %w", vaultConfigPath, err)
+	}
+	fmt.Printf("Successfully loaded configuration map from Vault path '%s'.\n", vaultConfigPath)
+
+	// 5. Isi struct Config menggunakan nilai dari configMap
+	cfg := &Config{
+		Environment: getStringFromMap(configMap, "environment", "development"),
+		TenantID:    getStringFromMap(configMap, "tenant_id", "default"),
 		Consul: ConsulConfig{
-			Address: getEnvString("CONSUL_ADDRESS", "http://localhost:8500"),
-			Token:   getEnvString("CONSUL_TOKEN", ""),
+			Address: getStringFromMap(configMap, "consul_address", "http://localhost:8500"),
+			Token:   getStringFromMap(configMap, "consul_token", ""),
 		},
 		Database: DatabaseConfig{
-			Host:     getEnvString("DB_HOST", "localhost"),
-			Port:     getEnvInt("DB_PORT", DefaultDBPort),
-			Database: getEnvString("DB_NAME", "prism_erp"),
-			Username: getEnvString("DB_USER", "prism"),
-			Password: getEnvString("DB_PASSWORD", "prism123"),
-			SSLMode:  getEnvString("DB_SSL_MODE", "disable"),
+			Host:     getStringFromMap(configMap, "db_host", "localhost"),
+			Port:     getIntFromMap(configMap, "db_port", DefaultDBPort),
+			Database: getStringFromMap(configMap, "db_name", "prism_erp"),
+			Username: getStringFromMap(configMap, "db_user", "prism"),
+			Password: getStringFromMap(configMap, "db_password", ""), // Default kosong, harus ada di Vault
+			SSLMode:  getStringFromMap(configMap, "db_ssl_mode", "disable"),
 		},
 		Redis: RedisConfig{
-			Host:     getEnvString("REDIS_HOST", "localhost"),
-			Port:     getEnvInt("REDIS_PORT", DefaultRedisPort),
-			Password: getEnvString("REDIS_PASSWORD", "redis123"),
-			DB:       getEnvInt("REDIS_DB", 0),
+			Host:     getStringFromMap(configMap, "redis_host", "localhost"),
+			Port:     getIntFromMap(configMap, "redis_port", DefaultRedisPort),
+			Password: getStringFromMap(configMap, "redis_password", ""), // Default kosong, harus ada di Vault
+			DB:       getIntFromMap(configMap, "redis_db", 0),
 		},
 		JWT: JWTConfig{
-			Secret:         jwtSecret, // Sudah dimuat di atas
-			ExpirationTime: getConfigInt("config/jwt/expiration", "JWT_EXPIRATION", DefaultJWTExpiration),
+			Secret:         getStringFromMap(configMap, "jwt_secret", ""), // Default kosong, harus ada di Vault
+			ExpirationTime: getIntFromMap(configMap, "jwt_expiration", DefaultJWTExpiration),
 		},
 		Server: ServerConfig{
-			Port:         getEnvInt("SERVER_PORT", DefaultServerPort),
-			ReadTimeout:  getEnvInt("SERVER_READ_TIMEOUT", DefaultReadTimeout),
-			WriteTimeout: getEnvInt("SERVER_WRITE_TIMEOUT", DefaultWriteTimeout),
+			Port:         getIntFromMap(configMap, "server_port", DefaultServerPort),
+			ReadTimeout:  getIntFromMap(configMap, "server_read_timeout", DefaultReadTimeout),
+			WriteTimeout: getIntFromMap(configMap, "server_write_timeout", DefaultWriteTimeout),
 		},
+		// Anda bisa menambahkan field lain seperti LogLevel, GinMode ke struct Config jika perlu
+		// dan memuatnya dari configMap juga.
 	}
 
-	return config, nil
+	// Inisialisasi Consul Client untuk Service Discovery (jika masih digunakan)
+	// Ini terpisah dari pembacaan config dari Vault KV, kecuali jika consul_address dari Vault
+	// Jika Anda masih menggunakan Consul untuk service discovery (bukan config KV)
+	// Anda perlu initConsulKVClient(cfg.Consul.Address) di sini atau di main.go
+	// seperti sebelumnya, karena initConsulKVClient yang lama mungkin tidak dipanggil.
+	// Atau, service discovery bisa menggunakan cfg.Consul.Address yang sudah dimuat.
+	// Jika Anda membuat `discovery.NewConsulClient(cfg)` di main.go, pastikan cfg.Consul.Address benar.
+
+	return cfg, nil
 }
 
 func (d *DatabaseConfig) DSN() string {
@@ -212,6 +260,7 @@ func (r RedisConfig) Address() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
 }
 
+// Fungsi getEnvString LAMA (hanya baca dari env, untuk variabel yang tidak perlu Consul KV)
 func getEnvString(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -219,6 +268,7 @@ func getEnvString(key, defaultValue string) string {
 	return defaultValue
 }
 
+// Fungsi getEnvInt LAMA (hanya baca dari env)
 func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
