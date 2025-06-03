@@ -1,99 +1,24 @@
+// File: prism-common-libs/pkg/config/config.go
 package config
 
 import (
+	"context" // <-- TAMBAHKAN IMPORT INI
 	"fmt"
 	"os"
 	"strconv"
 
+	// "time" // Tambahkan jika Anda ingin menggunakan context.WithTimeout
+
 	"github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/secrets" // Import Vault client Anda
-	consulapi "github.com/hashicorp/consul/api"
+	// consulapi "github.com/hashicorp/consul/api" // Tidak dibutuhkan jika tidak ada lagi Consul KV read di sini
 )
 
-// Variabel global untuk Consul client, diinisialisasi sekali
-var consulKVClient *consulapi.Client
-
-// initConsulKVClient inisialisasi Consul client untuk KV store
-func initConsulKVClient(consulAddress string) error {
-	if consulKVClient != nil {
-		return nil // Sudah diinisialisasi
-	}
-	conf := consulapi.DefaultConfig()
-	if consulAddress != "" {
-		conf.Address = consulAddress
-	}
-	// Tambahkan token jika diperlukan: conf.Token = os.Getenv("CONSUL_HTTP_TOKEN")
-
-	client, err := consulapi.NewClient(conf)
-	if err != nil {
-		return fmt.Errorf("failed to create consul KV client: %w", err)
-	}
-	consulKVClient = client
-	return nil
-}
-
-// getConsulKV mengambil nilai dari Consul KV.
-// Mengembalikan nilai dan boolean true jika ditemukan, atau string kosong dan false jika tidak.
-func getConsulKV(key string) (string, bool) {
-	if consulKVClient == nil {
-		// Coba inisialisasi jika belum. Ini hanya akan terjadi jika Load dipanggil sebelum
-		// CONSUL_ADDRESS diset atau jika tidak ada service discovery.
-		// Idealnya, initConsulKVClient dipanggil di awal Load().
-		addr := getEnvString("CONSUL_ADDRESS", "http://localhost:8500")
-		if err := initConsulKVClient(addr); err != nil {
-			fmt.Printf("Warning: Consul KV client not initialized for key '%s': %v\n", key, err)
-			return "", false
-		}
-	}
-
-	kvPair, _, err := consulKVClient.KV().Get(key, nil)
-	if err != nil {
-		fmt.Printf("Warning: Error fetching key '%s' from Consul KV: %v\n", key, err)
-		return "", false
-	}
-	if kvPair == nil || kvPair.Value == nil {
-		return "", false // Key tidak ditemukan
-	}
-	return string(kvPair.Value), true
-}
-
-// getConfigString membaca string dari Consul KV, lalu env, lalu default.
-// consulKey: path di Consul KV (e.g., "config/myapp/loglevel")
-// envKey: nama environment variable (e.g., "LOG_LEVEL")
-func getConfigString(consulKey, envKey, defaultValue string) string {
-	// Coba dari Consul KV
-	if consulKey != "" {
-		if val, found := getConsulKV(consulKey); found {
-			fmt.Printf("Loaded '%s' from Consul KV: %s\n", consulKey, val)
-			return val
-		}
-	}
-	// Fallback ke Environment Variable
-	if envVal := os.Getenv(envKey); envVal != "" {
-		fmt.Printf("Loaded '%s' from ENV: %s\n", envKey, envVal)
-		return envVal
-	}
-	// Fallback ke Default
-	fmt.Printf("Using default for '%s'/'%s': %s\n", consulKey, envKey, defaultValue)
-	return defaultValue
-}
-
-// getConfigInt membaca int dari Consul KV, lalu env, lalu default.
-func getConfigInt(consulKey, envKey string, defaultValue int) int {
-	strVal := getConfigString(consulKey, envKey, "")
-	if strVal != "" {
-		if intValue, err := strconv.Atoi(strVal); err == nil {
-			return intValue
-		}
-		fmt.Printf("Warning: Could not parse int from '%s' (value: %s) for Consul key '%s'/env key '%s'. Using default.\n", strVal, consulKey, envKey)
-	}
-	// Jika dari Consul/Env tidak valid atau kosong, gunakan default
-	if envVal := os.Getenv(envKey); envVal != "" { // Cek env lagi jika consul tidak ada/valid
-		if intValue, err := strconv.Atoi(envVal); err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
-}
+// Hapus bagian Consul KV jika tidak lagi digunakan untuk memuat konfigurasi:
+// var consulKVClient *consulapi.Client
+// func initConsulKVClient(...) { ... }
+// func getConsulKV(...) (string, bool) { ... }
+// func getConfigString(...) string { ... } // Ini digantikan oleh getStringFromMap
+// func getConfigInt(...) int { ... }     // Ini digantikan oleh getIntFromMap
 
 type DatabaseConfig struct {
 	Host     string
@@ -113,104 +38,123 @@ type RedisConfig struct {
 
 type ServerConfig struct {
 	Port         int
-	ReadTimeout  int
-	WriteTimeout int
+	ReadTimeout  int // Dalam detik
+	WriteTimeout int // Dalam detik
+	// GinMode      string // Opsional: bisa ditambahkan di sini jika ingin dari Vault
+}
+
+type JWTConfig struct {
+	Secret         string
+	ExpirationTime int // Dalam detik
+}
+
+type ConsulConfig struct { // Ini untuk konfigurasi koneksi ke Consul untuk Service Discovery
+	Address string
+	Token   string
 }
 
 type Config struct {
 	Environment string
 	TenantID    string
-	Database    DatabaseConfig
-	Redis       RedisConfig
-	JWT         JWTConfig
-	Server      ServerConfig
-	Consul      ConsulConfig // Tambahkan ini
-	ServiceName string       // Diisi dari Vault
-}
+	ServiceName string // Harus diisi dari Vault
+	// LogLevel    string // Opsional: jika ingin level log dari Vault
 
-type JWTConfig struct {
-	Secret         string // Akan diisi dari Vault atau env
-	ExpirationTime int
-	// VaultPath      string // Opsional: path ke secret di Vault
-	// VaultKey       string // Opsional: key dari secret di Vault
-}
-
-type ConsulConfig struct {
-	Address string
-	Token   string
+	Database DatabaseConfig
+	Redis    RedisConfig
+	JWT      JWTConfig
+	Server   ServerConfig
+	Consul   ConsulConfig // Info koneksi ke Consul untuk Service Discovery
 }
 
 const (
 	DefaultDBPort        = 5432
 	DefaultRedisPort     = 6379
-	DefaultJWTExpiration = 3600 // 1 hour in seconds
+	DefaultJWTExpiration = 3600 // 1 jam
 	DefaultServerPort    = 8080
-	DefaultReadTimeout   = 10 // seconds
-	DefaultWriteTimeout  = 10 // seconds
+	DefaultReadTimeout   = 10 // detik
+	DefaultWriteTimeout  = 10 // detik
 )
 
-// Helper untuk mengambil nilai dari map konfigurasi yang dimuat dari Vault, dengan fallback
+// Helper untuk mengambil nilai string dari map konfigurasi, dengan fallback
 func getStringFromMap(configMap map[string]string, key string, defaultValue string) string {
-	if val, ok := configMap[key]; ok {
+	if val, ok := configMap[key]; ok && val != "" { // Tambahkan cek val != ""
 		return val
 	}
-	fmt.Printf("Warning: Key '%s' not found in Vault config map. Using default: '%s'\n", key, defaultValue)
+	// Tidak perlu print warning di sini jika default digunakan, kecuali jika key wajib ada
+	// fmt.Printf("Warning: Key '%s' not found or empty in Vault config map. Using default: '%s'\n", key, defaultValue)
 	return defaultValue
 }
 
+// Helper untuk mengambil nilai integer dari map konfigurasi, dengan fallback
 func getIntFromMap(configMap map[string]string, key string, defaultValue int) int {
-	if strVal, ok := configMap[key]; ok {
+	if strVal, ok := configMap[key]; ok && strVal != "" { // Tambahkan cek strVal != ""
 		if intVal, err := strconv.Atoi(strVal); err == nil {
 			return intVal
 		}
 		fmt.Printf("Warning: Failed to parse int for key '%s' (value: '%s') from Vault config map. Using default: %d\n", key, strVal, defaultValue)
 	} else {
-		fmt.Printf("Warning: Key '%s' not found in Vault config map. Using default: %d\n", key, defaultValue)
+		// fmt.Printf("Warning: Key '%s' not found or empty in Vault config map. Using default: %d\n", key, defaultValue)
 	}
 	return defaultValue
 }
 
 func Load() (*Config, error) {
-	// 1. Dapatkan VAULT_ADDR dan VAULT_TOKEN dari environment (ini adalah bootstrap vars)
+	// 1. Buat parent context untuk operasi load konfigurasi
+	// Anda bisa menambahkan timeout jika perlu, contoh:
+	// loadCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // 10 detik timeout
+	// defer cancel()
+	loadCtx := context.Background() // Untuk sekarang, cukup dengan Background context
+
+	// 2. Dapatkan VAULT_ADDR dan VAULT_TOKEN dari environment (bootstrap variables)
 	vaultAddr := os.Getenv("VAULT_ADDR")
-	vaultToken := os.Getenv("VAULT_TOKEN") // Atau mekanisme auth lain
+	// VAULT_TOKEN akan otomatis dibaca oleh NewVaultClient jika diset di env.
+	// Jika Anda perlu logika khusus untuk VAULT_TOKEN (misalnya, membaca dari file jika tidak di env),
+	// Anda bisa melakukannya di sini sebelum memanggil NewVaultClient atau di dalam NewVaultClient.
 
 	if vaultAddr == "" {
-		return nil, fmt.Errorf("VAULT_ADDR environment variable not set")
+		return nil, fmt.Errorf("VAULT_ADDR environment variable is not set. Cannot connect to Vault")
 	}
-	// Untuk dev, kita bisa asumsikan VAULT_TOKEN ada. Di prod, gunakan AppRole atau auth method lain.
-	if vaultToken == "" && os.Getenv("ENVIRONMENT") == "development" { // Cek jika ENVIRONMENT diset
-		// Ini asumsi, lebih baik VAULT_TOKEN diset eksplisit
-		fmt.Println("Warning: VAULT_TOKEN not set, assuming dev mode (roottoken may or may not work depending on SDK).")
-	}
+	// Logika untuk VAULT_TOKEN di development (jika perlu):
+	// if os.Getenv("VAULT_TOKEN") == "" && (os.Getenv("ENVIRONMENT") == "development" || os.Getenv("GIN_MODE") == "debug") {
+	//     fmt.Println("Warning: VAULT_TOKEN environment variable is not set. Vault client might fail if not running in dev mode with a known root token or if auth method is not configured.")
+	// }
 
-	// 2. Inisialisasi Vault Client
-	// NewVaultClient() sudah diubah untuk membaca VAULT_ADDR dan VAULT_TOKEN dari env
-	vClient, err := secrets.NewVaultClient()
+	// 3. Inisialisasi Vault Client
+	vClient, err := secrets.NewVaultClient() // NewVaultClient sudah diperbarui untuk menggunakan env vars
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Vault client: %w", err)
 	}
 
-	// 3. Tentukan path konfigurasi di Vault
-	// Ini bisa juga dari env var jika Anda ingin lebih fleksibel
+	// 4. Tentukan path konfigurasi di Vault
 	vaultConfigPath := os.Getenv("VAULT_CONFIG_PATH")
 	if vaultConfigPath == "" {
-		vaultConfigPath = "config/prism-auth-service" // Default path
-		fmt.Printf("VAULT_CONFIG_PATH not set, using default: %s\n", vaultConfigPath)
+		vaultConfigPath = "config/prism-auth-service" // Default path ke secret
+		fmt.Printf("VAULT_CONFIG_PATH environment variable not set, using default: '%s'\n", vaultConfigPath)
 	}
 
-	// 4. Baca semua konfigurasi dari Vault
-	configMap, err := vClient.ReadAllSecrets(vaultConfigPath)
+	// Tentukan mount path KV engine Anda.
+	kvMountPath := os.Getenv("VAULT_KV_MOUNT_PATH")
+	if kvMountPath == "" {
+		kvMountPath = "secret" // Default mount path untuk KV v2
+		fmt.Printf("VAULT_KV_MOUNT_PATH environment variable not set, using default: '%s'\n", kvMountPath)
+	}
+
+	// 5. Baca semua konfigurasi dari Vault, teruskan context dan mount path
+	fmt.Printf("Attempting to load configuration from Vault: Mount='%s', Path='%s'\n", kvMountPath, vaultConfigPath)
+	configMap, err := vClient.ReadAllSecrets(loadCtx, kvMountPath, vaultConfigPath) // <-- PERUBAHAN DI SINI
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration from Vault path '%s': %w", vaultConfigPath, err)
+		return nil, fmt.Errorf("failed to load configuration from Vault (mount: %s, path: %s): %w", kvMountPath, vaultConfigPath, err)
 	}
-	fmt.Printf("Successfully loaded configuration map from Vault path '%s'.\n", vaultConfigPath)
+	fmt.Printf("Successfully loaded %d configuration entries from Vault path '%s'.\n", len(configMap), vaultConfigPath)
 
-	// 5. Isi struct Config menggunakan nilai dari configMap
+	// 6. Isi struct Config menggunakan nilai dari configMap
 	cfg := &Config{
 		Environment: getStringFromMap(configMap, "environment", "development"),
 		TenantID:    getStringFromMap(configMap, "tenant_id", "default"),
-		Consul: ConsulConfig{
+		ServiceName: getStringFromMap(configMap, "service_name", ""), // Wajib ada di Vault
+		// LogLevel:    getStringFromMap(configMap, "log_level", "info"), // Jika Anda menambahkannya
+
+		Consul: ConsulConfig{ // Info untuk koneksi ke Consul untuk Service Discovery
 			Address: getStringFromMap(configMap, "consul_address", "http://localhost:8500"),
 			Token:   getStringFromMap(configMap, "consul_token", ""),
 		},
@@ -219,39 +163,49 @@ func Load() (*Config, error) {
 			Port:     getIntFromMap(configMap, "db_port", DefaultDBPort),
 			Database: getStringFromMap(configMap, "db_name", "prism_erp"),
 			Username: getStringFromMap(configMap, "db_user", "prism"),
-			Password: getStringFromMap(configMap, "db_password", ""), // Default kosong, harus ada di Vault
+			Password: getStringFromMap(configMap, "db_password", ""), // Wajib ada di Vault
 			SSLMode:  getStringFromMap(configMap, "db_ssl_mode", "disable"),
 		},
 		Redis: RedisConfig{
 			Host:     getStringFromMap(configMap, "redis_host", "localhost"),
 			Port:     getIntFromMap(configMap, "redis_port", DefaultRedisPort),
-			Password: getStringFromMap(configMap, "redis_password", ""), // Default kosong, harus ada di Vault
+			Password: getStringFromMap(configMap, "redis_password", ""), // Bisa kosong jika Redis tanpa auth
 			DB:       getIntFromMap(configMap, "redis_db", 0),
 		},
 		JWT: JWTConfig{
-			Secret:         getStringFromMap(configMap, "jwt_secret", ""), // Default kosong, harus ada di Vault
+			Secret:         getStringFromMap(configMap, "jwt_secret", ""), // Wajib ada di Vault
 			ExpirationTime: getIntFromMap(configMap, "jwt_expiration", DefaultJWTExpiration),
 		},
 		Server: ServerConfig{
-			Port:         getIntFromMap(configMap, "server_port", DefaultServerPort),
+			Port:         getIntFromMap(configMap, "server_port", DefaultServerPort), // Wajib ada di Vault
 			ReadTimeout:  getIntFromMap(configMap, "server_read_timeout", DefaultReadTimeout),
 			WriteTimeout: getIntFromMap(configMap, "server_write_timeout", DefaultWriteTimeout),
+			// GinMode:      getStringFromMap(configMap, "gin_mode", "debug"), // Jika Anda menambahkannya
 		},
-		// Anda bisa menambahkan field lain seperti LogLevel, GinMode ke struct Config jika perlu
-		// dan memuatnya dari configMap juga.
 	}
 
-	// Inisialisasi Consul Client untuk Service Discovery (jika masih digunakan)
-	// Ini terpisah dari pembacaan config dari Vault KV, kecuali jika consul_address dari Vault
-	// Jika Anda masih menggunakan Consul untuk service discovery (bukan config KV)
-	// Anda perlu initConsulKVClient(cfg.Consul.Address) di sini atau di main.go
-	// seperti sebelumnya, karena initConsulKVClient yang lama mungkin tidak dipanggil.
-	// Atau, service discovery bisa menggunakan cfg.Consul.Address yang sudah dimuat.
-	// Jika Anda membuat `discovery.NewConsulClient(cfg)` di main.go, pastikan cfg.Consul.Address benar.
+	// Validasi konfigurasi penting (contoh)
+	if cfg.ServiceName == "" {
+		return nil, fmt.Errorf("critical configuration 'service_name' is missing from Vault")
+	}
+	if cfg.Server.Port == 0 {
+		return nil, fmt.Errorf("critical configuration 'server_port' is missing from Vault")
+	}
+	if cfg.Database.Password == "" { // Atau field lain yang wajib
+		fmt.Println("Warning: 'db_password' is empty. Ensure this is intentional (e.g., local dev without password).")
+	}
+	if cfg.JWT.Secret == "" {
+		return nil, fmt.Errorf("critical configuration 'jwt_secret' is missing from Vault")
+	}
+
+	// Hapus fungsi getEnvString dan getEnvInt yang lama dari file ini
+	// jika semua konfigurasi aplikasi sekarang HANYA berasal dari Vault.
+	// Jika Anda masih memerlukan fallback ke env var untuk beberapa hal (jarang), biarkan.
 
 	return cfg, nil
 }
 
+// Metode DSN dan Address tetap berguna
 func (d *DatabaseConfig) DSN() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.Username, d.Password, d.Database, d.SSLMode)
@@ -259,22 +213,4 @@ func (d *DatabaseConfig) DSN() string {
 
 func (r RedisConfig) Address() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
-}
-
-// Fungsi getEnvString LAMA (hanya baca dari env, untuk variabel yang tidak perlu Consul KV)
-func getEnvString(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// Fungsi getEnvInt LAMA (hanya baca dari env)
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
 }
