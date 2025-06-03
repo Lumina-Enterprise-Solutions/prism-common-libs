@@ -1,10 +1,17 @@
+// File: prism-common-libs/pkg/logger/logger.go
 package logger
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/httputil"
 	"os"
+	"runtime/debug"
 	"strings"
+	"time" // Tambahkan ini
 
+	"github.com/gin-gonic/gin" // Tambahkan ini
 	"github.com/sirupsen/logrus"
 )
 
@@ -131,36 +138,148 @@ func init() {
 	noColors := os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
 
 	// Use JSON formatter in production, custom formatter in development
-	env := os.Getenv("ENVIRONMENT")
+	env := os.Getenv("ENVIRONMENT") // Anda mungkin memuat ini dari Vault sekarang
 	if env == "production" || env == "prod" {
 		Log.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: "2006-01-02T15:04:05.000Z",
+			// FieldMap: logrus.FieldMap{ // Opsional: rename default fields
+			//  logrus.FieldKeyTime: "@timestamp",
+			//  logrus.FieldKeyMsg:  "message",
+			// },
 		})
 	} else {
 		Log.SetFormatter(&CustomFormatter{
-			TimestampFormat: "15:04:05",
+			TimestampFormat: "15:04:05", // Format waktu di log dev
 			NoColors:        noColors,
 		})
 	}
 
 	// Set log level
-	level := os.Getenv("LOG_LEVEL")
-	switch strings.ToLower(level) {
-	case "debug":
-		Log.SetLevel(logrus.DebugLevel)
-	case "info":
-		Log.SetLevel(logrus.InfoLevel)
-	case "warn", "warning":
-		Log.SetLevel(logrus.WarnLevel)
-	case "error":
-		Log.SetLevel(logrus.ErrorLevel)
-	case "fatal":
-		Log.SetLevel(logrus.FatalLevel)
-	default:
-		Log.SetLevel(logrus.InfoLevel)
+	// Ini juga bisa diambil dari konfigurasi yang dimuat dari Vault
+	logLevelEnv := os.Getenv("LOG_LEVEL")
+	parsedLevel, err := logrus.ParseLevel(logLevelEnv)
+	if err != nil {
+		Log.SetLevel(logrus.InfoLevel) // Default jika parsing gagal
+		// Log.Warnf("Invalid LOG_LEVEL '%s', defaulting to 'info'", logLevelEnv)
+	} else {
+		Log.SetLevel(parsedLevel)
 	}
 }
 
+// GinLogger adalah middleware untuk logging request HTTP menggunakan logrus.
+// Ini akan menggantikan logger default Gin.
+func GinLogger(logger *logrus.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		startTime := time.Now()
+		c.Next() // Proses request
+
+		endTime := time.Now()
+		latency := endTime.Sub(startTime)
+		statusCode := c.Writer.Status()
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		if c.Request.URL.RawQuery != "" {
+			path = path + "?" + c.Request.URL.RawQuery
+		}
+		requestID := c.GetString("request_id") // Dari middleware RequestID Anda
+
+		entry := logger.WithFields(logrus.Fields{
+			"type":        "access_log", // Untuk membedakan dari log aplikasi biasa
+			"status_code": statusCode,
+			"latency_ms":  latency.Milliseconds(), // Latency dalam milidetik
+			"client_ip":   clientIP,
+			"method":      method,
+			"path":        path,
+			"request_id":  requestID, // Sertakan request ID jika ada
+			// "user_agent": c.Request.UserAgent(), // Opsional
+		})
+
+		if len(c.Errors) > 0 {
+			// Gabungkan error jika ada (Gin menyimpan error di c.Errors)
+			entry.Error(c.Errors.ByType(gin.ErrorTypePrivate).String())
+		} else {
+			msg := fmt.Sprintf("%s %s %d (%s)", method, path, statusCode, latency)
+			if statusCode >= http.StatusInternalServerError {
+				entry.Error(msg)
+			} else if statusCode >= http.StatusBadRequest {
+				entry.Warn(msg)
+			} else {
+				entry.Info(msg)
+			}
+		}
+	}
+}
+
+// GinRecovery adalah middleware untuk menangani panic dan log error menggunakan logrus.
+// Ini akan menggantikan recovery default Gin.
+func GinRecovery(logger *logrus.Logger, stack bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Periksa apakah koneksi rusak (broken pipe)
+				var brokenPipe bool
+				if ne, ok := err.(*net.OpError); ok {
+					if se, ok := ne.Err.(*os.SyscallError); ok {
+						if strings.Contains(strings.ToLower(se.Error()), "broken pipe") || strings.Contains(strings.ToLower(se.Error()), "connection reset by peer") {
+							brokenPipe = true
+						}
+					}
+				}
+
+				httpRequest, _ := httputil.DumpRequest(c.Request, false)
+				requestID := c.GetString("request_id")
+
+				if brokenPipe {
+					logger.WithFields(logrus.Fields{
+						"type":       "recovery_log",
+						"request_id": requestID,
+						"error":      err,
+						"request":    string(httpRequest),
+					}).Error("Recovery from broken pipe")
+					// Jika koneksi rusak, kita tidak bisa mengirim response apa pun.
+					// c.Error(err.(error)) // Jika Anda ingin Gin menangani ini lebih lanjut
+					c.Abort()
+					return
+				}
+
+				headers := ""
+				if stack {
+					headers = string(debug.Stack())
+				}
+
+				logger.WithFields(logrus.Fields{
+					"type":       "panic_log",
+					"request_id": requestID,
+					"error":      err,
+					"stack":      headers, // Sertakan stack trace jika diminta
+					"request":    string(httpRequest),
+				}).Error("[Recovery] panic recovered")
+
+				// Kembalikan response error 500
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"message": "An internal server error occurred.",
+					"error":   "internal_server_error", // Kode error generik
+					// "request_id": requestID, // Bisa juga sertakan request ID di response
+				})
+			}
+		}()
+		c.Next()
+	}
+}
+
+// Fungsi helper untuk parse level (digunakan di init atau jika Anda ingin mengubah level secara dinamis)
+// func ParseLevel(lvl string) (logrus.Level, error) {
+// 	return logrus.ParseLevel(lvl)
+// }
+
+// Fungsi helper untuk set level (jika Anda ingin mengubah level setelah init)
+// func SetLevel(level logrus.Level) {
+// 	Log.SetLevel(level)
+// }
+
+// --- Fungsi log yang sudah ada (WithFields, Debug, Info, dll.) tetap sama ---
 // WithFields creates an entry with multiple fields
 func WithFields(fields logrus.Fields) *logrus.Entry {
 	return Log.WithFields(fields)

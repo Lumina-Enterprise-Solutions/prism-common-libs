@@ -42,6 +42,15 @@ func (c *ConsulClient) RegisterService(serviceID, serviceName, address string, p
 	return nil
 }
 
+func (c *ConsulClient) DeregisterService(serviceID string) error {
+	err := c.client.Agent().ServiceDeregister(serviceID)
+	if err != nil {
+		return fmt.Errorf("failed to deregister service %s: %w", serviceID, err)
+	}
+	logger.Info("Service deregistered from Consul", "service_id", serviceID)
+	return nil
+}
+
 func (c *ConsulClient) DiscoverService(serviceName string) ([]*api.ServiceEntry, error) {
 	services, _, err := c.client.Health().Service(serviceName, "", true, nil)
 	if err != nil {
