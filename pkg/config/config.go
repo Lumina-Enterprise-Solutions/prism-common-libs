@@ -40,6 +40,12 @@ type Config struct {
 	Redis       RedisConfig
 	JWT         JWTConfig
 	Server      ServerConfig
+	Consul      ConsulConfig // Tambahkan ini
+}
+
+type ConsulConfig struct {
+	Address string
+	Token   string
 }
 
 const (
@@ -55,6 +61,10 @@ func Load() (*Config, error) {
 	config := &Config{
 		Environment: getEnvString("ENVIRONMENT", "development"),
 		TenantID:    getEnvString("TENANT_ID", "default"),
+		Consul: ConsulConfig{
+			Address: getEnvString("CONSUL_ADDRESS", "http://localhost:8500"),
+			Token:   getEnvString("CONSUL_TOKEN", ""),
+		},
 		Database: DatabaseConfig{
 			Host:     getEnvString("DB_HOST", "localhost"),
 			Port:     getEnvInt("DB_PORT", DefaultDBPort),
