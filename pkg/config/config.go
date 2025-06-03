@@ -125,6 +125,7 @@ type Config struct {
 	JWT         JWTConfig
 	Server      ServerConfig
 	Consul      ConsulConfig // Tambahkan ini
+	ServiceName string       // Diisi dari Vault
 }
 
 type JWTConfig struct {
