@@ -14,7 +14,8 @@ type ConsulClient struct {
 
 func NewConsulClient(cfg *config.Config) (*ConsulClient, error) {
 	config := api.DefaultConfig()
-	config.Address = "http://localhost:8500" // Update for production
+	config.Address = cfg.Consul.Address
+	config.Token = cfg.Consul.Token
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
