@@ -22,11 +22,6 @@ type RedisConfig struct {
 	DB       int
 }
 
-type JWTConfig struct {
-	Secret         string
-	ExpirationTime int
-}
-
 type ServerConfig struct {
 	Port         int
 	ReadTimeout  int
@@ -41,6 +36,13 @@ type Config struct {
 	JWT         JWTConfig
 	Server      ServerConfig
 	Consul      ConsulConfig // Tambahkan ini
+}
+
+type JWTConfig struct {
+	Secret         string // Akan diisi dari Vault atau env
+	ExpirationTime int
+	// VaultPath      string // Opsional: path ke secret di Vault
+	// VaultKey       string // Opsional: key dari secret di Vault
 }
 
 type ConsulConfig struct {
@@ -58,6 +60,29 @@ const (
 )
 
 func Load() (*Config, error) {
+	// Muat JWT Secret dari Vault atau fallback ke environment variable
+	// jwtSecret := getEnvString("JWT_SECRET", "your-secret-key-default-fallback") // Default fallback
+
+	// Uncomment dan sesuaikan jika ingin load dari Vault:
+	/*
+	   vaultClient, err := secrets.NewVaultClient() // Asumsikan VAULT_ADDR dan VAULT_TOKEN ada di env
+	   if err != nil {
+	       // Mungkin log warning dan lanjutkan dengan env var, atau return error
+	       fmt.Printf("Warning: Failed to create Vault client: %v. Falling back to JWT_SECRET env var.\n", err)
+	   } else {
+	       // Path dan key ini harus sesuai dengan yang Anda simpan di Vault
+	       vaultPath := getEnvString("JWT_VAULT_PATH", "prism/auth-service/jwt")
+	       vaultKey := getEnvString("JWT_VAULT_KEY", "secret")
+
+	       retrievedSecret, err := vaultClient.ReadSecret(vaultPath, vaultKey)
+	       if err != nil {
+	           fmt.Printf("Warning: Failed to read JWT secret from Vault (%s, key %s): %v. Falling back to JWT_SECRET env var.\n", vaultPath, vaultKey, err)
+	       } else {
+	           jwtSecret = retrievedSecret
+	           fmt.Println("Successfully loaded JWT secret from Vault.")
+	       }
+	   }
+	*/
 	config := &Config{
 		Environment: getEnvString("ENVIRONMENT", "development"),
 		TenantID:    getEnvString("TENANT_ID", "default"),
@@ -80,8 +105,10 @@ func Load() (*Config, error) {
 			DB:       getEnvInt("REDIS_DB", 0),
 		},
 		JWT: JWTConfig{
-			Secret:         getEnvString("JWT_SECRET", "your-secret-key"),
+			Secret:         getEnvString("JWT_SECRET", "your-secret-key"), // Ini akan diganti jika Vault berhasil
 			ExpirationTime: getEnvInt("JWT_EXPIRATION", DefaultJWTExpiration),
+			// VaultPath:      getEnvString("JWT_VAULT_PATH", "prism/auth-service/jwt"),
+			// VaultKey:       getEnvString("JWT_VAULT_KEY", "secret"),
 		},
 		Server: ServerConfig{
 			Port:         getEnvInt("SERVER_PORT", DefaultServerPort),
