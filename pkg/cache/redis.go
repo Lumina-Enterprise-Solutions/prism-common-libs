@@ -3,11 +3,15 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	configDb "github.com/Lumina-Enterprise-Solutions/prism-common-libs/pkg/config"
 	"github.com/redis/go-redis/v9"
 )
+
+// ErrNil dikembalikan oleh Get saat key tidak ditemukan.
+var ErrNil = errors.New("cache: key not found") // <-- [TAMBAHKAN]
 
 type RedisClient struct {
 	client *redis.Client
@@ -31,9 +35,13 @@ func (r *RedisClient) Set(ctx context.Context, key string, value interface{}, ex
 	return r.client.Set(ctx, key, data, expiration).Err()
 }
 
+
 func (r *RedisClient) Get(ctx context.Context, key string, dest interface{}) error {
 	data, err := r.client.Get(ctx, key).Result()
 	if err != nil {
+		if errors.Is(err, redis.Nil) { // <-- [MODIFIKASI]
+			return ErrNil
+		}
 		return err
 	}
 	return json.Unmarshal([]byte(data), dest)
