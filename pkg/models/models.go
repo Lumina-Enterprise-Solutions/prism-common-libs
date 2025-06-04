@@ -16,7 +16,7 @@ type BaseModel struct {
 
 type User struct {
 	BaseModel
-	Email        string `json:"email" gorm:"uniqueIndex"`
+	Email        string `json:"email" gorm:"uniqueIndex"` // Seharusnya unik per tenant, bukan global jika multi-tenant
 	PasswordHash string `json:"-"`
 	FirstName    string `json:"first_name"`
 	LastName     string `json:"last_name"`
@@ -24,11 +24,16 @@ type User struct {
 	Roles        []Role `json:"roles" gorm:"many2many:user_roles;"`
 }
 
+// PermissionMap mendefinisikan struktur untuk permissions.
+// Key: Nama Resource (e.g., "users", "articles")
+// Value: Slice dari action yang diizinkan (e.g., "create", "read", "update", "delete")
+type PermissionMap map[string][]string
+
 type Role struct {
 	BaseModel
-	Name        string                 `json:"name"`
-	Permissions map[string]interface{} `json:"permissions" gorm:"type:jsonb;serializer:json"`
-	Users       []User                 `json:"-" gorm:"many2many:user_roles;"`
+	Name        string        `json:"name" gorm:"uniqueIndex"`                       // Seharusnya unik per tenant
+	Permissions PermissionMap `json:"permissions" gorm:"type:jsonb;serializer:json"` // [MODIFIKASI]
+	Users       []User        `json:"-" gorm:"many2many:user_roles;"`
 }
 
 type Tenant struct {
