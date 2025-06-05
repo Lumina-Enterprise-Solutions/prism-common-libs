@@ -59,3 +59,32 @@ type ADGroupRoleMapping struct {
 	// Role        Role      `json:"role,omitempty" gorm:"foreignKey:RoleID"` // Relasi ini mungkin sulit jika Role per tenant dan mapping di public
 	TenantID string `json:"tenant_id" gorm:"not null;uniqueIndex:idx_mapping_tenant_adgroup"`
 }
+type AuditEvent struct {
+	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
+	Timestamp      time.Time `gorm:"not null;default:current_timestamp"`
+	ServiceName    string    `gorm:"not null"`
+	RequestID      uuid.UUID `gorm:"type:uuid"`
+	TenantID       string    `gorm:"not null;index"`
+	ActorID        uuid.UUID `gorm:"type:uuid;index"` // Gunakan uuid.UUID langsung, service akan handle pointer jika perlu
+	ActorEmail     string
+	ActorIPAddress string
+	Action         string `gorm:"not null;index"`
+	Outcome        string `gorm:"not null"`
+	TargetResource string
+	TargetID       string
+	Details        []byte `gorm:"type:jsonb"`
+	Signature      string `gorm:"not null"`
+	Version        int    `gorm:"not null;default:1"`
+}
+
+func (AuditEvent) TableName() string {
+	return "public.audit_logs"
+}
+
+// AuditDetails mewakili payload yang diserialisasi ke dalam field 'details'.
+type AuditDetails struct {
+	Reason string      `json:"reason,omitempty"`
+	Before interface{} `json:"before,omitempty"`
+	After  interface{} `json:"after,omitempty"`
+	Error  string      `json:"error,omitempty"`
+}
