@@ -74,13 +74,17 @@ type LDAPConfig struct {
 	ADUserFilter             string `mapstructure:"ad_user_filter"`              // e.g., "(memberOf=CN=SyncMe,OU=Groups,DC=example,DC=com)"
 	// === END TAMBAHAN ===
 }
+type AuditConfig struct {
+	SigningKey string
+}
 
 type Config struct {
 	Environment string
 	TenantID    string
 	ServiceName string // Harus diisi dari Vault
 	// LogLevel    string // Opsional: jika ingin level log dari Vault
-	LDAP LDAPConfig // <-- Pastikan ini ada
+	LDAP  LDAPConfig  // <-- Pastikan ini ada
+	Audit AuditConfig // <-- TAMBAHKAN INI
 
 	Database DatabaseConfig
 	Redis    RedisConfig
@@ -224,6 +228,9 @@ func Load() (*Config, error) {
 			ADUserFilter:             getStringFromMap(configMap, "ldap_user_filter", ""),
 			// === END PEMUATAN ===
 		},
+		Audit: AuditConfig{
+			SigningKey: getStringFromMap(configMap, "audit_signing_key", ""), // Wajib ada di Vault
+		},
 	}
 
 	// Validasi konfigurasi penting (contoh)
@@ -251,6 +258,9 @@ func Load() (*Config, error) {
 		if cfg.LDAP.ADAttributeObjectGUID == "" {
 			return nil, fmt.Errorf("LDAP is configured but 'ldap_ad_attribute_object_guid' is missing")
 		}
+	}
+	if cfg.Audit.SigningKey == "" {
+		return nil, fmt.Errorf("critical configuration 'audit_signing_key' is missing from Vault")
 	}
 
 	return cfg, nil
