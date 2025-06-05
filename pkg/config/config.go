@@ -54,20 +54,25 @@ type ConsulConfig struct { // Ini untuk konfigurasi koneksi ke Consul untuk Serv
 }
 
 type LDAPConfig struct {
-	Host         string `mapstructure:"host"`          // e.g., "ad.example.com"
-	Port         int    `mapstructure:"port"`          // e.g., 389 (LDAP) atau 636 (LDAPS)
-	UseTLS       bool   `mapstructure:"use_tls"`       // Apakah menggunakan StartTLS atau LDAPS
-	BindDN       string `mapstructure:"bind_dn"`       // DN akun layanan untuk binding/pencarian, e.g., "CN=svc_ldap,OU=ServiceAccounts,DC=example,DC=com"
-	BindPassword string `mapstructure:"bind_password"` // Password akun layanan (dari Vault!)
-	UserBaseDN   string `mapstructure:"user_base_dn"`  // Base DN untuk mencari user, e.g., "OU=Users,DC=example,DC=com"
-	GroupBaseDN  string `mapstructure:"group_base_dn"` // Base DN untuk mencari grup (jika perlu)
-	// Atribut AD yang akan dipetakan ke field User lokal
-	ADAttributeEmail      string `mapstructure:"ad_attribute_email"`       // e.g., "mail"
-	ADAttributeFirstName  string `mapstructure:"ad_attribute_first_name"`  // e.g., "givenName"
-	ADAttributeLastName   string `mapstructure:"ad_attribute_last_name"`   // e.g., "sn"
-	ADAttributeUPN        string `mapstructure:"ad_attribute_upn"`         // e.g., "userPrincipalName"
-	ADAttributeObjectGUID string `mapstructure:"ad_attribute_object_guid"` // e.g., "objectGUID" (perlu konversi dari binary)
-	ADAttributeMemberOf   string `mapstructure:"ad_attribute_member_of"`   // e.g., "memberOf"
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	UseTLS       bool   `mapstructure:"use_tls"`
+	BindDN       string `mapstructure:"bind_dn"`
+	BindPassword string `mapstructure:"bind_password"`
+	UserBaseDN   string `mapstructure:"user_base_dn"`
+	GroupBaseDN  string `mapstructure:"group_base_dn"`
+
+	ADAttributeEmail      string `mapstructure:"ad_attribute_email"`
+	ADAttributeFirstName  string `mapstructure:"ad_attribute_first_name"`
+	ADAttributeLastName   string `mapstructure:"ad_attribute_last_name"`
+	ADAttributeUPN        string `mapstructure:"ad_attribute_upn"`
+	ADAttributeObjectGUID string `mapstructure:"ad_attribute_object_guid"` // Untuk AD asli, ini binary. Untuk OpenLDAP, bisa entryUUID (string)
+	ADAttributeMemberOf   string `mapstructure:"ad_attribute_member_of"`
+
+	// === TAMBAHKAN ATAU PASTIKAN FIELD INI ADA ===
+	ADAttributeAccountStatus string `mapstructure:"ad_attribute_account_status"` // e.g., "userAccountControl"
+	ADUserFilter             string `mapstructure:"ad_user_filter"`              // e.g., "(memberOf=CN=SyncMe,OU=Groups,DC=example,DC=com)"
+	// === END TAMBAHAN ===
 }
 
 type Config struct {
@@ -203,17 +208,21 @@ func Load() (*Config, error) {
 		LDAP: LDAPConfig{
 			Host:                  getStringFromMap(configMap, "ldap_host", ""),
 			Port:                  getIntFromMap(configMap, "ldap_port", 389),
-			UseTLS:                getBoolFromMap(configMap, "ldap_use_tls", false), // Anda perlu helper getBoolFromMap
+			UseTLS:                getBoolFromMap(configMap, "ldap_use_tls", false),
 			BindDN:                getStringFromMap(configMap, "ldap_bind_dn", ""),
-			BindPassword:          getStringFromMap(configMap, "ldap_bind_password", ""), // Ini harusnya secret!
+			BindPassword:          getStringFromMap(configMap, "ldap_bind_password", ""),
 			UserBaseDN:            getStringFromMap(configMap, "ldap_user_base_dn", ""),
 			GroupBaseDN:           getStringFromMap(configMap, "ldap_group_base_dn", ""),
 			ADAttributeEmail:      getStringFromMap(configMap, "ldap_ad_attribute_email", "mail"),
 			ADAttributeFirstName:  getStringFromMap(configMap, "ldap_ad_attribute_first_name", "givenName"),
 			ADAttributeLastName:   getStringFromMap(configMap, "ldap_ad_attribute_last_name", "sn"),
 			ADAttributeUPN:        getStringFromMap(configMap, "ldap_ad_attribute_upn", "userPrincipalName"),
-			ADAttributeObjectGUID: getStringFromMap(configMap, "ldap_ad_attribute_object_guid", "objectGUID"),
+			ADAttributeObjectGUID: getStringFromMap(configMap, "ldap_ad_attribute_object_guid", "objectGUID"), // atau entryUUID
 			ADAttributeMemberOf:   getStringFromMap(configMap, "ldap_ad_attribute_member_of", "memberOf"),
+			// === PASTIKAN INI DIMUAT DARI configMap ===
+			ADAttributeAccountStatus: getStringFromMap(configMap, "ldap_ad_attribute_account_status", "userAccountControl"),
+			ADUserFilter:             getStringFromMap(configMap, "ldap_user_filter", ""),
+			// === END PEMUATAN ===
 		},
 	}
 
@@ -231,9 +240,17 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("critical configuration 'jwt_secret' is missing from Vault")
 	}
 
-	if cfg.LDAP.Host != "" && cfg.LDAP.BindPassword == "" { // Contoh validasi sederhana
-		// Password bisa kosong jika anonymous bind, tapi jarang untuk operasi write/sync
-		fmt.Println("Warning: LDAP host is configured but ldap_bind_password is empty.")
+	// Tambahkan validasi untuk LDAP jika host diset
+	if cfg.LDAP.Host != "" {
+		if cfg.LDAP.UserBaseDN == "" {
+			return nil, fmt.Errorf("LDAP is configured but 'ldap_user_base_dn' is missing")
+		}
+		if cfg.LDAP.ADAttributeUPN == "" {
+			return nil, fmt.Errorf("LDAP is configured but 'ldap_ad_attribute_upn' is missing")
+		}
+		if cfg.LDAP.ADAttributeObjectGUID == "" {
+			return nil, fmt.Errorf("LDAP is configured but 'ldap_ad_attribute_object_guid' is missing")
+		}
 	}
 
 	return cfg, nil
@@ -249,7 +266,7 @@ func (r RedisConfig) Address() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
 }
 
-// Helper getBoolFromMap (tambahkan jika belum ada)
+// Helper getStringFromMap, getIntFromMap, getBoolFromMap (pastikan getBoolFromMap ada)
 func getBoolFromMap(configMap map[string]string, key string, defaultValue bool) bool {
 	if strVal, ok := configMap[key]; ok && strVal != "" {
 		if boolVal, err := strconv.ParseBool(strVal); err == nil {

@@ -59,28 +59,3 @@ type ADGroupRoleMapping struct {
 	// Role        Role      `json:"role,omitempty" gorm:"foreignKey:RoleID"` // Relasi ini mungkin sulit jika Role per tenant dan mapping di public
 	TenantID string `json:"tenant_id" gorm:"not null;uniqueIndex:idx_mapping_tenant_adgroup"`
 }
-
-type LDAPConfig struct {
-	Host         string `mapstructure:"host"`
-	Port         int    `mapstructure:"port"`
-	UseTLS       bool   `mapstructure:"use_tls"`
-	BindDN       string `mapstructure:"bind_dn"`
-	BindPassword string `mapstructure:"bind_password"`
-	UserBaseDN   string `mapstructure:"user_base_dn"`  // Base DN umum untuk user
-	GroupBaseDN  string `mapstructure:"group_base_dn"` // Base DN umum untuk grup
-
-	// Atribut AD yang akan dipetakan
-	ADAttributeEmail         string `mapstructure:"ad_attribute_email"`
-	ADAttributeFirstName     string `mapstructure:"ad_attribute_first_name"`
-	ADAttributeLastName      string `mapstructure:"ad_attribute_last_name"`
-	ADAttributeUPN           string `mapstructure:"ad_attribute_upn"`
-	ADAttributeObjectGUID    string `mapstructure:"ad_attribute_object_guid"`
-	ADAttributeMemberOf      string `mapstructure:"ad_attribute_member_of"`
-	ADAttributeAccountStatus string `mapstructure:"ad_attribute_account_status"` // e.g., "userAccountControl"
-	ADUserFilter             string `mapstructure:"ad_user_filter"`              // Filter LDAP tambahan untuk user sync, e.g., "(memberOf=CN=SyncGroup,OU=Groups,DC=example,DC=com)"
-
-	// Per Tenant Override (opsional, jika setiap tenant punya OU/filter AD berbeda)
-	// Ini bisa jadi map[string]TenantLDAPConfig atau array struct
-	// Untuk sekarang, kita asumsikan satu konfigurasi AD UserBaseDN dan Filter untuk semua tenant yang disinkronkan.
-	// Jika perlu per-tenant, ini akan lebih kompleks.
-}
