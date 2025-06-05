@@ -53,11 +53,29 @@ type ConsulConfig struct { // Ini untuk konfigurasi koneksi ke Consul untuk Serv
 	Token   string
 }
 
+type LDAPConfig struct {
+	Host         string `mapstructure:"host"`          // e.g., "ad.example.com"
+	Port         int    `mapstructure:"port"`          // e.g., 389 (LDAP) atau 636 (LDAPS)
+	UseTLS       bool   `mapstructure:"use_tls"`       // Apakah menggunakan StartTLS atau LDAPS
+	BindDN       string `mapstructure:"bind_dn"`       // DN akun layanan untuk binding/pencarian, e.g., "CN=svc_ldap,OU=ServiceAccounts,DC=example,DC=com"
+	BindPassword string `mapstructure:"bind_password"` // Password akun layanan (dari Vault!)
+	UserBaseDN   string `mapstructure:"user_base_dn"`  // Base DN untuk mencari user, e.g., "OU=Users,DC=example,DC=com"
+	GroupBaseDN  string `mapstructure:"group_base_dn"` // Base DN untuk mencari grup (jika perlu)
+	// Atribut AD yang akan dipetakan ke field User lokal
+	ADAttributeEmail      string `mapstructure:"ad_attribute_email"`       // e.g., "mail"
+	ADAttributeFirstName  string `mapstructure:"ad_attribute_first_name"`  // e.g., "givenName"
+	ADAttributeLastName   string `mapstructure:"ad_attribute_last_name"`   // e.g., "sn"
+	ADAttributeUPN        string `mapstructure:"ad_attribute_upn"`         // e.g., "userPrincipalName"
+	ADAttributeObjectGUID string `mapstructure:"ad_attribute_object_guid"` // e.g., "objectGUID" (perlu konversi dari binary)
+	ADAttributeMemberOf   string `mapstructure:"ad_attribute_member_of"`   // e.g., "memberOf"
+}
+
 type Config struct {
 	Environment string
 	TenantID    string
 	ServiceName string // Harus diisi dari Vault
 	// LogLevel    string // Opsional: jika ingin level log dari Vault
+	LDAP LDAPConfig // <-- Pastikan ini ada
 
 	Database DatabaseConfig
 	Redis    RedisConfig
@@ -182,6 +200,21 @@ func Load() (*Config, error) {
 			WriteTimeout: getIntFromMap(configMap, "server_write_timeout", DefaultWriteTimeout),
 			// GinMode:      getStringFromMap(configMap, "gin_mode", "debug"), // Jika Anda menambahkannya
 		},
+		LDAP: LDAPConfig{
+			Host:                  getStringFromMap(configMap, "ldap_host", ""),
+			Port:                  getIntFromMap(configMap, "ldap_port", 389),
+			UseTLS:                getBoolFromMap(configMap, "ldap_use_tls", false), // Anda perlu helper getBoolFromMap
+			BindDN:                getStringFromMap(configMap, "ldap_bind_dn", ""),
+			BindPassword:          getStringFromMap(configMap, "ldap_bind_password", ""), // Ini harusnya secret!
+			UserBaseDN:            getStringFromMap(configMap, "ldap_user_base_dn", ""),
+			GroupBaseDN:           getStringFromMap(configMap, "ldap_group_base_dn", ""),
+			ADAttributeEmail:      getStringFromMap(configMap, "ldap_ad_attribute_email", "mail"),
+			ADAttributeFirstName:  getStringFromMap(configMap, "ldap_ad_attribute_first_name", "givenName"),
+			ADAttributeLastName:   getStringFromMap(configMap, "ldap_ad_attribute_last_name", "sn"),
+			ADAttributeUPN:        getStringFromMap(configMap, "ldap_ad_attribute_upn", "userPrincipalName"),
+			ADAttributeObjectGUID: getStringFromMap(configMap, "ldap_ad_attribute_object_guid", "objectGUID"),
+			ADAttributeMemberOf:   getStringFromMap(configMap, "ldap_ad_attribute_member_of", "memberOf"),
+		},
 	}
 
 	// Validasi konfigurasi penting (contoh)
@@ -198,9 +231,10 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("critical configuration 'jwt_secret' is missing from Vault")
 	}
 
-	// Hapus fungsi getEnvString dan getEnvInt yang lama dari file ini
-	// jika semua konfigurasi aplikasi sekarang HANYA berasal dari Vault.
-	// Jika Anda masih memerlukan fallback ke env var untuk beberapa hal (jarang), biarkan.
+	if cfg.LDAP.Host != "" && cfg.LDAP.BindPassword == "" { // Contoh validasi sederhana
+		// Password bisa kosong jika anonymous bind, tapi jarang untuk operasi write/sync
+		fmt.Println("Warning: LDAP host is configured but ldap_bind_password is empty.")
+	}
 
 	return cfg, nil
 }
@@ -213,4 +247,15 @@ func (d *DatabaseConfig) DSN() string {
 
 func (r RedisConfig) Address() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
+}
+
+// Helper getBoolFromMap (tambahkan jika belum ada)
+func getBoolFromMap(configMap map[string]string, key string, defaultValue bool) bool {
+	if strVal, ok := configMap[key]; ok && strVal != "" {
+		if boolVal, err := strconv.ParseBool(strVal); err == nil {
+			return boolVal
+		}
+		fmt.Printf("Warning: Failed to parse bool for key '%s' (value: '%s') from Vault config map. Using default: %t\n", key, strVal, defaultValue)
+	}
+	return defaultValue
 }
