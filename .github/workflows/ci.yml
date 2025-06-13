@@ -41,11 +41,11 @@ jobs:
     - name: Tidy Go Modules
       run: go mod tidy
 
-    # Langkah 4: Menjalankan linter
+    # Langkah 4: Menjalankan linter dengan golangci
     - name: Run linter
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v8
       with:
-        version: v1.58 # Versi linter yang akan digunakan
+        version: v2.1
 
     # Langkah 5: Menjalankan unit tests
     - name: Run unit tests with coverage
