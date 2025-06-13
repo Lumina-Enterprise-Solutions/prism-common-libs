@@ -1,77 +1,86 @@
-# Prism Common Libraries
+# 💎 Prism Common Libraries
 
 [![Go CI Pipeline](https://github.com/Lumina-Enterprise-Solutions/prism-common-libs/actions/workflows/ci.yml/badge.svg)](https://github.com/Lumina-Enterprise-Solutions/prism-common-libs/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/Lumina-Enterprise-Solutions/prism-common-libs)](https://github.com/Lumina-Enterprise-Solutions/prism-common-libs/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Latest Release](https://img.shields.io/github/v/release/Lumina-Enterprise-Solutions/prism-common-libs?style=flat-square&logo=github)](https://github.com/Lumina-Enterprise-Solutions/prism-common-libs/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Lumina-Enterprise-Solutions/prism-common-libs)](https://goreportcard.com/report/github.com/Lumina-Enterprise-Solutions/prism-common-libs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-Repositori ini berisi kumpulan pustaka (libraries) dan utilitas bersama yang digunakan oleh semua microservices di dalam ekosistem **Prism ERP** oleh **Lumina Enterprise Solutions**. Tujuan utama dari repositori ini adalah untuk standarisasi kode, mengurangi duplikasi, dan menyederhanakan dependensi antar layanan.
-
----
-
-## Modul yang Tersedia
-
--   `config`: Loader konfigurasi terpusat yang membaca dari *environment variables* dan *Consul KV*.
--   `consul`: Utilitas untuk pendaftaran layanan (service discovery) ke Consul.
--   `handlers`: Handler HTTP umum seperti `HealthCheckHandler`.
--   `jwt`: Middleware dan helper untuk validasi token JWT.
--   `model`: Definisi model data bersama seperti `User` dan `FileMetadata`.
--   `rbac`: Middleware untuk Role-Based Access Control (RBAC).
--   `telemetry`: Konfigurasi terpusat untuk OpenTelemetry (tracing).
--   `vault`: Klien sederhana untuk membaca *secrets* dari HashiCorp Vault.
+Repositori ini adalah fondasi bersama untuk semua microservices dalam ekosistem **Prism ERP**. Tujuannya adalah untuk menyediakan pustaka Go yang teruji, konsisten, dan dapat digunakan kembali untuk mempercepat pengembangan, mengurangi duplikasi kode, dan menegakkan praktik terbaik di seluruh platform.
 
 ---
 
-## Cara Penggunaan
+## ✨ Prinsip Desain
 
-Repositori ini dimaksudkan untuk digunakan sebagai Go Module. Untuk menambahkannya sebagai dependensi pada layanan Anda:
+Pustaka ini dirancang dengan prinsip-prinsip berikut:
 
-1.  **Tambahkan ke dependensi Anda**:
-    Jalankan perintah berikut di dalam direktori layanan Anda:
+-   **🎯 Generik & Dapat Digunakan Kembali**: Modul tidak memiliki pengetahuan spesifik tentang layanan yang menggunakannya. Semua konfigurasi spesifik disuntikkan oleh layanan pemanggil.
+-   **🧩 Kohesi Tinggi, Kopling Rendah**: Fungsionalitas yang terkait dikelompokkan bersama (`auth`, `client`), sementara dependensi antar modul diminimalkan.
+-   **🛡️ Aman & Teruji**: Semua kode harus melalui pipeline CI yang ketat, termasuk linting dan pengujian, untuk memastikan kualitas dan stabilitas.
+-   **🔭 Dapat Diamati (Observable)**: Menyediakan utilitas standar untuk telemetri (tracing & metrics) agar semua layanan dapat dipantau secara konsisten.
+
+---
+
+## 📚 Struktur & Modul yang Tersedia
+
+Setiap direktori tingkat atas adalah sebuah paket Go yang dapat diimpor, dikelompokkan berdasarkan fungsionalitasnya.
+
+<br/>
+
+| Direktori                                                                      | Deskripsi                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 📂 **`auth/`** <br/> `import ".../auth"`                                         | 🔑 Utilitas untuk Otentikasi & Otorisasi. Berisi middleware untuk validasi token JWT dan Role-Based Access Control (RBAC) yang siap digunakan dengan Gin.                                              |
+| 📂 **`client/`** <br/> `import ".../client"`                                     | 🔌 Klien untuk berinteraksi dengan layanan infrastruktur eksternal. Menyediakan wrapper yang disederhanakan untuk **HashiCorp Consul** (pendaftaran layanan) dan **HashiCorp Vault** (manajemen rahasia). |
+| 📂 **`config/`** <br/> `import ".../config"`                                     | ⚙️ Pemuat konfigurasi terpusat. Membaca nilai dari *environment variables* dengan *fallback* ke **Consul KV store**, memungkinkan konfigurasi yang fleksibel dan dinamis.                           |
+| 📂 **`ginutil/`** <br/> `import ".../ginutil"`                                   | 🌐 Utilitas khusus untuk framework Gin. Saat ini berisi *handler* `Health Check` yang dapat diperluas dan konsisten untuk digunakan oleh Consul atau load balancer.                                   |
+| 📂 **`model/`** <br/> `import ".../model"`                                       | 📦 Definisi model data (struct) yang menjadi *Single Source of Truth* untuk entitas yang dibagikan antar layanan, seperti `User` dan `FileMetadata`.                                                  |
+| 📂 **`telemetry/`** <br/> `import ".../telemetry"`                               | 📡 Utilitas untuk standarisasi observabilitas. Menyediakan *initializer* untuk **OpenTelemetry** (Tracing) yang mengirimkan data ke Jaeger, memastikan semua layanan memiliki jejak terdistribusi. |
+
+---
+
+## 🚀 Cara Menggunakan
+
+Repositori ini dimaksudkan untuk digunakan sebagai modul Go dalam `go.work` atau `go.mod` di setiap microservice.
+
+1.  **Tambahkan sebagai Dependensi**:
+    Jalankan perintah berikut di dalam direktori layanan Anda. Pastikan untuk mengganti `vX.Y.Z` dengan versi rilis terbaru.
     ```bash
-    go get github.com/Lumina-Enterprise-Solutions/prism-common-libs@v0.1.0
+    go get github.com/Lumina-Enterprise-Solutions/prism-common-libs@vX.Y.Z
     ```
-    *(Ganti `v0.1.0` dengan versi rilis terbaru yang ingin Anda gunakan)*
 
-2.  **Impor dan gunakan modul**:
-    Impor paket yang dibutuhkan di dalam kode Go Anda.
-
+2.  **Impor dan Gunakan**:
+    Impor paket yang dibutuhkan dalam kode Go Anda. Contoh:
     ```go
     import (
-        "github.com/gin-gonic/gin"
-        "github.com/Lumina-Enterprise-Solutions/prism-common-libs/handlers"
-        commonjwt "github.com/Lumina-Enterprise-Solutions/prism-common-libs/jwt"
+        "github.com/Lumina-Enterprise-Solutions/prism-common-libs/auth"
+        "github.com/Lumina-Enterprise-Solutions/prism-common-libs/client"
     )
-
-    func main() {
-        router := gin.Default()
-
-        // Contoh penggunaan health check handler
-        handlers.SetupHealthRoutes(router, "my-service", "1.0.0")
-
-        // Contoh penggunaan middleware JWT
-        protected := router.Group("/api")
-        protected.Use(commonjwt.JWTMiddleware())
-        {
-            // ... rute yang dilindungi ...
-        }
-
-        router.Run()
-    }
     ```
 
 ---
 
-## Kontribusi
+## 🤝 Kontribusi
 
-Perubahan pada pustaka ini memiliki dampak luas ke semua layanan. Oleh karena itu, proses kontribusi diatur dengan ketat untuk menjaga kualitas dan stabilitas.
+Kontribusi Anda sangat kami hargai! Karena pustaka ini adalah dependensi kritis, kami mengikuti alur kerja yang ketat untuk menjaga kualitas.
 
-1.  **Buat Issue**: Diskusikan perubahan yang ingin Anda buat melalui GitHub Issues terlebih dahulu.
-2.  **Fork dan Branch**: Buat *fork* dari repositori ini dan buat *branch* baru untuk perubahan Anda.
-3.  **Implementasi & Test**: Implementasikan perubahan Anda dan pastikan semua tes lolos (`go test -v ./...`).
-4.  **Buat Pull Request**: Buka Pull Request (PR) ke branch `main`.
-5.  **Review**: PR Anda harus disetujui oleh **Code Owners** yang ditunjuk.
-6.  **Merge**: Setelah disetujui dan semua *status checks* berhasil, PR akan di-*squash and merge* oleh maintainer.
+1.  **Diskusi Awal**: Buka **GitHub Issue** untuk mendiskusikan perubahan atau fitur baru yang ingin Anda tambahkan. Diskusikan ide Anda dengan tim terlebih dahulu.
+2.  **Fork & Branch**: Buat *fork* dari repositori ini dan buat *branch* baru dari `main` dengan nama yang deskriptif (misalnya, `feature/add-kafka-client` atau `bugfix/fix-jwt-parsing`).
+3.  **Implementasi & Pengujian**:
+    -   Tulis kode Anda sesuai dengan prinsip desain yang ada.
+    -   Pastikan kode Anda lolos semua pemeriksaan linter (`golangci-lint run`).
+    -   Tambahkan *unit test* yang relevan untuk perubahan Anda.
+    -   Jalankan semua tes untuk memastikan tidak ada *regression* (`go test -v ./...`).
+4.  **Pull Request (PR)**:
+    -   Buka *Pull Request* ke branch `main`.
+    -   Pastikan PR Anda memiliki deskripsi yang jelas tentang "mengapa" dan "apa" dari perubahan tersebut.
+    -   PR harus mendapatkan persetujuan dari **CODEOWNERS** yang relevan.
+    -   Semua *status checks* (CI Pipeline) harus berhasil.
+5.  **Merge**: Setelah disetujui, maintainer akan me-*squash and merge* PR Anda.
 
-## Rilis (Versioning)
+---
 
-Repositori ini mengikuti **Semantic Versioning**. Versi baru akan dirilis melalui GitHub Actions setiap kali sebuah tag baru dengan format `vX.Y.Z` (contoh: `v0.2.0`) di-*push* ke repositori.
+## 🏷️ Versioning & Rilis
+
+Kami mengikuti **Semantic Versioning 2.0.0**. Proses rilis diotomatisasi melalui GitHub Actions.
+
+-   **Rilis Baru**: Untuk membuat rilis baru, seorang maintainer akan membuat dan me-*push* tag Git baru dengan format `vX.Y.Z` (misalnya, `v0.2.0`).
+-   **Otomatisasi**: Tindakan ini akan secara otomatis memicu alur kerja `release.yml`, yang akan membuat **GitHub Release** baru berdasarkan tag tersebut.
