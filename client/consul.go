@@ -1,5 +1,5 @@
-// file: prism-common-libs/consul/registration.go
-package client
+// file: prism-common-libs/client/consul.go
+package client // Pastikan package name sudah benar
 
 import (
 	"fmt"
@@ -38,11 +38,11 @@ func RegisterService(info ServiceRegistrationInfo) (*consulapi.Client, error) {
 
 	// Buat payload registrasi
 	registration := &consulapi.AgentServiceRegistration{
-		ID:   info.ServiceID,
-		Name: info.ServiceName,
-		Port: info.Port,
-		Tags: info.Tags,
-		Meta: info.Meta,
+		ID:      info.ServiceID,
+		Name:    info.ServiceName,
+		Port:    info.Port,
+		Tags:    info.Tags,
+		Meta:    info.Meta,
 		Check: &consulapi.AgentServiceCheck{
 			HTTP:                           info.HealthCheckURL,
 			Interval:                       "10s",
@@ -66,6 +66,10 @@ func RegisterService(info ServiceRegistrationInfo) (*consulapi.Client, error) {
 // DeregisterService menghapus registrasi service dari Consul.
 // Menerima client Consul yang sama yang dikembalikan oleh RegisterService.
 func DeregisterService(client *consulapi.Client, serviceID string) {
+	if client == nil {
+		log.Printf("Peringatan: Mencoba menghapus registrasi dengan Consul client yang nil untuk service ID %s.", serviceID)
+		return
+	}
 	if err := client.Agent().ServiceDeregister(serviceID); err != nil {
 		log.Printf("Gagal menghapus registrasi service '%s': %v", serviceID, err)
 	} else {
@@ -91,7 +95,8 @@ func (b *TraefikTagBuilder) Build() []string {
 	}
 
 	if b.Priority > 0 {
-		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.priority=%d", b.Priority, b.ServiceName))
+		// PERBAIKAN DI SINI: Tukar urutan argumen
+		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.priority=%d", b.ServiceName, b.Priority))
 	}
 
 	// Gabungkan middleware dengan aman
