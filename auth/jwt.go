@@ -1,5 +1,5 @@
 // common/prism-common-libs/jwt/jwt.go
-package jwt // <-- CHANGED from 'middleware'
+package auth // <-- CHANGED from 'middleware'
 
 import (
 	"context"

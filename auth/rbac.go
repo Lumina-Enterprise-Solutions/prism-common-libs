@@ -1,5 +1,5 @@
 // file: common/prism-common-libs/rbac/rbac.go
-package rbac
+package auth
 
 import (
 	"fmt"
