@@ -1,0 +1,59 @@
+# Nama workflow yang akan muncul di tab "Actions" GitHub
+name: Go CI Pipeline
+
+# Pemicu (Triggers)
+# Workflow ini akan berjalan setiap kali ada 'push' atau 'pull_request' ke branch 'main'
+# Juga berjalan pada PR yang menargetkan 'main'
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  # Nama job. Anda bisa menamainya apa saja. "build" adalah nama yang umum.
+  # Nama ini akan digunakan di Branch Protection Rules.
+  build:
+    # Menggunakan runner terbaru yang disediakan GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+    # Langkah 1: Checkout kode repositori
+    # Ini akan mengunduh kode Anda ke runner
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Langkah 2: Setup lingkungan Go
+    # Menentukan versi Go yang akan digunakan
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24' # Sesuaikan dengan versi Go Anda
+
+    # Langkah 3: Menjalankan go mod tidy
+    # Memastikan file go.mod dan go.sum bersih dan konsisten
+    - name: Tidy Go Modules
+      run: go mod tidy
+
+    # Langkah 4: Menjalankan linter
+    # Menggunakan golangci-lint-action untuk memeriksa kualitas kode
+    - name: Run linter
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.58 # Versi linter yang akan digunakan
+
+    # Langkah 5: Menjalankan unit tests
+    # Menjalankan semua tes di dalam modul
+    # Menghasilkan profil cakupan (coverage profile) untuk analisis lebih lanjut
+    - name: Run unit tests with coverage
+      run: go test -v ./... -coverprofile=coverage.out
+
+    # Langkah 6 (Opsional): Mengunggah laporan cakupan
+    # Menyimpan file coverage.out sebagai artifact, yang bisa diunduh atau digunakan oleh tool lain.
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.out

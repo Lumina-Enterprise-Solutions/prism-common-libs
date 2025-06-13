@@ -1,0 +1,26 @@
+# This is a CODEOWNERS file.
+# Lines starting with '#' are comments. Each line is a file pattern followed by one or more owners.
+#
+# These owners will be automatically requested for review when a pull request
+# changes a file that A/a file_path:  "patterns".
+
+# Baris pertama ini bersifat umum: setiap perubahan di mana pun dalam repo
+# akan meminta review dari tim "Platform-Team".
+# Tim harus ada di GitHub dengan format @<nama-organisasi>/<nama-tim>.
+# Ganti dengan nama organisasi dan tim Anda yang sebenarnya.
+*       @Lumina-Enterprise-Solutions/Platform-Team
+
+# Untuk perubahan yang sangat krusial seperti konfigurasi CI/CD
+# dan definisi kepemilikan kode, minta review dari tim "Architecture-Team".
+.github/    @Lumina-Enterprise-Solutions/Architecture-Team
+
+# Modul-modul kritis juga diawasi oleh Architecture Team.
+/vault/      @Lumina-Enterprise-Solutions/Architecture-Team @Lumina-Enterprise-Solutions/Platform-Team
+/telemetry/  @Lumina-Enterprise-Solutions/Platform-Team
+/jwt/        @Lumina-Enterprise-Solutions/Platform-Team @Lumina-Enterprise-Solutions/Architecture-Team
+/rbac/       @Lumina-Enterprise-Solutions/Platform-Team @Lumina-Enterprise-Solutions/Architecture-Team
+
+# Perubahan pada file dependensi (go.mod, go.sum) harus diperiksa oleh
+# tim arsitektur untuk memastikan tidak ada dependensi yang berisiko ditambahkan.
+go.mod      @Lumina-Enterprise-Solutions/Architecture-Team
+go.sum      @Lumina-Enterprise-Solutions/Architecture-Team

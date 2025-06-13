@@ -1,0 +1,47 @@
+# Nama workflow untuk proses rilis
+name: Create Release
+
+# Pemicu (Triggers)
+# Workflow ini hanya berjalan saat ada tag baru yang di-push dengan format v* (e.g., v0.1.0, v1.2.3)
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  # Nama job
+  create_release:
+    # Menggunakan runner terbaru dari GitHub
+    runs-on: ubuntu-latest
+
+    # Izin (permissions) yang dibutuhkan oleh job
+    # Job ini perlu izin untuk menulis ke 'contents' untuk membuat release.
+    permissions:
+      contents: write
+
+    steps:
+    # Langkah 1: Checkout kode repositori
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Langkah 2: Membuat GitHub Release
+    # Menggunakan action `create-release` yang sudah ada untuk menyederhanakan proses.
+    - name: Create GitHub Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Token ini disediakan otomatis oleh GitHub
+      with:
+        # Mengambil nama tag dari event (e.g., "v0.1.0")
+        tag_name: ${{ github.ref }}
+        # Menjadikan nama rilis sama dengan nama tag
+        release_name: Release ${{ github.ref }}
+        # Catatan rilis bisa ditulis manual atau dibuat otomatis
+        # Jika Anda mengikuti Conventional Commits, ada action yang bisa membuat changelog otomatis.
+        # Untuk saat ini, kita biarkan kosong.
+        body: |
+          Rilis baru untuk shared library. Silakan perbarui dependensi di microservices Anda.
+        # Menandai ini bukan sebagai draft
+        draft: false
+        # Menandai ini bukan sebagai pre-release
+        prerelease: false
