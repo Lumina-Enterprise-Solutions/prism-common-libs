@@ -2,7 +2,9 @@ package client
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	vaultapi "github.com/hashicorp/vault/api"
 )
@@ -75,4 +77,18 @@ func (vc *VaultClient) ReadSecret(path, key string) (string, error) {
 	}
 
 	return valueStr, nil
+}
+func (vc *VaultClient) LoadSecretsToEnv(path string, keys ...string) error {
+	for _, key := range keys {
+		secretValue, err := vc.ReadSecret(path, key)
+		if err != nil {
+			// Return error jika ada satu saja rahasia yang gagal dimuat.
+			return fmt.Errorf("gagal memuat rahasia '%s' dari path '%s': %w", key, path, err)
+		}
+		if err := os.Setenv(strings.ToUpper(key), secretValue); err != nil {
+			return fmt.Errorf("gagal mengatur env var untuk '%s': %w", key, err)
+		}
+		log.Printf("Berhasil memuat rahasia '%s' dari Vault dan mengaturnya sebagai env var.", key)
+	}
+	return nil
 }
