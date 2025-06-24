@@ -50,10 +50,11 @@ func NewRBACMiddleware(userServiceAddress string, cacheTTL time.Duration) (*RBAC
 	}, nil
 }
 
-func (m *RBACMiddleware) Close() {
+func (m *RBACMiddleware) Close() error {
 	if m.conn != nil {
-		m.conn.Close()
+		return m.conn.Close()
 	}
+	return nil
 }
 
 // getPermissionsForRole mengambil izin untuk sebuah peran, menggunakan cache jika memungkinkan.
