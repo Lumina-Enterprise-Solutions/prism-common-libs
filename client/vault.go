@@ -14,28 +14,23 @@ type VaultClient struct {
 	client *vaultapi.Client
 }
 
-// NewVaultClient membuat dan mengonfigurasi klien baru untuk berinteraksi dengan Vault.
-func NewVaultClient() (*VaultClient, error) {
-	// Konfigurasi ini membaca alamat Vault dan token dari environment variables,
-	// yang akan kita set di docker-compose.yml.
+func NewVaultClient(vaultAddr, vaultToken string) (*VaultClient, error) {
 	config := vaultapi.DefaultConfig()
 
-	// Alamat Vault di dalam jaringan Docker
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		vaultAddr = "http://vault:8200" // Default jika tidak diset
-	}
+	// Gunakan parameter yang disuntikkan
 	config.Address = vaultAddr
+	if config.Address == "" {
+		return nil, fmt.Errorf("alamat Vault (vaultAddr) tidak boleh kosong")
+	}
 
 	client, err := vaultapi.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membuat klien vault: %w", err)
 	}
 
-	// Gunakan root token yang kita definisikan di docker-compose
-	vaultToken := os.Getenv("VAULT_TOKEN")
+	// Gunakan token yang disuntikkan
 	if vaultToken == "" {
-		vaultToken = "root-token-for-dev" // Default untuk dev
+		return nil, fmt.Errorf("token Vault (vaultToken) tidak boleh kosong")
 	}
 	client.SetToken(vaultToken)
 
