@@ -3,6 +3,7 @@ module github.com/Lumina-Enterprise-Solutions/prism-common-libs
 go 1.24.3
 
 require (
+	github.com/Lumina-Enterprise-Solutions/prism-protobufs v0.0.5
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/hashicorp/consul/api v1.32.1
