@@ -30,6 +30,7 @@ type RBACMiddleware struct {
 	userSvcClient userv1.UserServiceClient
 	cache         *permissionCache
 	cacheTTL      time.Duration
+	conn          *grpc.ClientConn
 }
 
 // NewRBACMiddleware membuat instance RBAC middleware baru.
@@ -45,11 +46,19 @@ func NewRBACMiddleware(userServiceAddress string, cacheTTL time.Duration) (*RBAC
 			permissions: make(map[string]cachedPermissions),
 		},
 		cacheTTL: cacheTTL,
+		conn:     conn, // PERUBAHAN: Simpan koneksi
 	}, nil
 }
 
+func (m *RBACMiddleware) Close() error {
+	if m.conn != nil {
+		return m.conn.Close()
+	}
+	return nil
+}
+
 // getPermissionsForRole mengambil izin untuk sebuah peran, menggunakan cache jika memungkinkan.
-func (m *RBACMiddleware) getPermissionsForRole(roleName string) (map[string]struct{}, error) {
+func (m *RBACMiddleware) getPermissionsForRole(ctx context.Context, roleName string) (map[string]struct{}, error) {
 	m.cache.mu.RLock()
 	cached, found := m.cache.permissions[roleName]
 	m.cache.mu.RUnlock()
@@ -60,7 +69,7 @@ func (m *RBACMiddleware) getPermissionsForRole(roleName string) (map[string]stru
 
 	// Jika tidak ada di cache atau sudah kedaluwarsa, ambil dari user-service
 	req := &userv1.GetPermissionsForRoleRequest{RoleName: roleName}
-	resp, err := m.userSvcClient.GetPermissionsForRole(context.Background(), req)
+	resp, err := m.userSvcClient.GetPermissionsForRole(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch permissions for role '%s': %w", roleName, err)
 	}
@@ -107,7 +116,7 @@ func (m *RBACMiddleware) RequirePermission(requiredPermission string) gin.Handle
 		}
 
 		// Ambil izin untuk peran ini (dari cache atau gRPC)
-		userPermissions, err := m.getPermissionsForRole(role)
+		userPermissions, err := m.getPermissionsForRole(c.Request.Context(), role)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not verify permissions", "details": err.Error()})
 			c.Abort()
