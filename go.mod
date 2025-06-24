@@ -3,12 +3,12 @@ module github.com/Lumina-Enterprise-Solutions/prism-common-libs
 go 1.24.3
 
 require (
-	github.com/Lumina-Enterprise-Solutions/prism-protobufs v0.0.5
+	github.com/Lumina-Enterprise-Solutions/prism-protobufs v0.0.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/hashicorp/consul/api v1.32.1
 	github.com/hashicorp/vault/api v1.20.0
-	github.com/redis/go-redis/v9 v9.10.0
+	github.com/redis/go-redis/v9 v9.11.0
 	go.opentelemetry.io/otel v1.36.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.36.0
 	go.opentelemetry.io/otel/sdk v1.36.0
