@@ -1,40 +1,29 @@
 # File: .github/dependabot.yml
-# Konfigurasi Dependabot untuk menjaga dependensi tetap mutakhir.
-
 version: 2
 updates:
-  # 1. Konfigurasi untuk GitHub Actions
-  # Menjaga action yang digunakan di workflow (seperti actions/checkout) tetap terbaru.
-  - package-ecosystem: "github-actions"
-    directory: "/" # Memeriksa semua file workflow di direktori .github/
-    schedule:
-      interval: "weekly"
-      day: "monday" # Menjalankan pemeriksaan setiap hari Senin
-    commit-message:
-      # Menambahkan prefix yang jelas untuk commit message
-      prefix: "chore(actions)"
-    labels:
-      - "dependabot"
-      - "ci-cd"
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+    interval: "weekly"
+    day: "monday"
+  commit-message:
+    prefix: "chore(actions)"
+  labels:
+  - "dependabot"
+  - "ci-cd"
 
-  # 2. Konfigurasi untuk Go Modules (menggunakan Go Workspaces)
-  # Dependabot harus dikonfigurasi untuk setiap modul Go secara terpisah.
-  # Kita akan mengelompokkan update agar Dependabot membuat satu PR untuk semua update Go.
-
-  # Modul: prism-common-libs
-  - package-ecosystem: "gomod"
-    directory: "/prism-common-libs" # Path ke direktori yang berisi go.mod
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    commit-message:
-      prefix: "chore(deps)"
-    labels:
-      - "dependabot"
-      - "dependencies"
-      - "go"
-    # Grupkan semua update Go ke dalam satu Pull Request
-    groups:
-      go-dependencies:
-        patterns: ["*"]
-
+- package-ecosystem: "gomod"
+  # PERBAIKAN: Path direktori harus "/" karena file .github ada di root repo ini.
+  directory: "/"
+  schedule:
+    interval: "weekly"
+    day: "monday"
+  commit-message:
+    prefix: "chore(deps)"
+  labels:
+  - "dependabot"
+  - "dependencies"
+  - "go"
+  groups:
+    go-dependencies:
+      patterns: [ "*" ]
