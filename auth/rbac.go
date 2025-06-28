@@ -53,7 +53,9 @@ func NewRBACMiddleware(userServiceAddress string, cacheTTL time.Duration) (*RBAC
 
 func (m *RBACMiddleware) Close() error {
 	if m.conn != nil {
+
 		log.Printf("Closing gRPC connection for RBAC middleware...")
+
 		return m.conn.Close()
 	}
 	return nil
