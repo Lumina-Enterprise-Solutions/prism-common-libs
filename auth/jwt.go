@@ -1,7 +1,8 @@
-// common/prism-common-libs/jwt/jwt.go
-package auth // <-- CHANGED from 'middleware'
+// File: prism-common-libs/auth/jwt.go
+package auth
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,22 +13,27 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// var (
-// 	redisClient *redis.Client
-// )
+// UserIDKey is the key used in the Gin context to store the user's ID.
+const UserIDKey = "user_id"
 
-// func init() {
-// 	// Middleware ini juga butuh koneksi ke Redis.
-// 	// Kita bisa inisialisasi di sini atau menerimanya sebagai parameter.
-// 	// Untuk kesederhanaan, kita inisialisasi di sini.
-// 	redisAddr := os.Getenv("REDIS_ADDR")
-// 	if redisAddr == "" {
-// 		redisAddr = "cache-redis:6379"
-// 	}
-// 	redisClient = redis.NewClient(&redis.Options{Addr: redisAddr})
-// }
+// ClaimsKey is the key used in the Gin context to store the full JWT claims map.
+const ClaimsKey = "claims"
 
-func JWTMiddleware(redisClient *redis.Client) gin.HandlerFunc {
+var (
+	redisClient *redis.Client
+)
+
+func init() {
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "cache-redis:6379"
+	}
+	redisClient = redis.NewClient(&redis.Options{Addr: redisAddr})
+}
+
+// JWTMiddleware validates JWT tokens and extracts user information.
+// FIX: The function signature is now parameter-less as it initializes its own Redis client.
+func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -43,8 +49,6 @@ func JWTMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 			return
 		}
 
-		// JWT_SECRET_KEY akan tetap dibaca dari env karena ini adalah rahasia runtime.
-		// Ini adalah salah satu pengecualian yang bisa diterima.
 		secretKey := os.Getenv("JWT_SECRET_KEY")
 		if secretKey == "" {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "JWT secret key not configured"})
@@ -72,9 +76,7 @@ func JWTMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-
-			// PERUBAHAN: Gunakan klien Redis yang di-pass sebagai parameter.
-			_, err := redisClient.Get(c.Request.Context(), jti).Result() // Gunakan context dari request
+			_, err := redisClient.Get(context.Background(), jti).Result()
 			if err != redis.Nil {
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not verify token with store"})
@@ -85,15 +87,16 @@ func JWTMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-
 			if userID, exists := claims["sub"]; exists {
-				c.Set("user_id", userID)
+				// FIX: Use the exported constant for the context key.
+				c.Set(UserIDKey, userID)
 			} else {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID (sub) not found in token claims"})
 				c.Abort()
 				return
 			}
-			c.Set("claims", claims)
+			// FIX: Use the exported constant for the context key.
+			c.Set(ClaimsKey, claims)
 		} else {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token or claims"})
 			c.Abort()
@@ -104,9 +107,10 @@ func JWTMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 	}
 }
 
-// GetUserID tidak berubah.
+// GetUserID extracts user ID from the Gin context after middleware validation.
 func GetUserID(c *gin.Context) (string, error) {
-	userID, exists := c.Get("user_id")
+	// FIX: Use the exported constant for the context key.
+	userID, exists := c.Get(UserIDKey)
 	if !exists {
 		return "", fmt.Errorf("user ID not found in context, middleware might be missing")
 	}
