@@ -13,27 +13,12 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// UserIDKey is the key used in the Gin context to store the user's ID.
 const UserIDKey = "user_id"
-
-// ClaimsKey is the key used in the Gin context to store the full JWT claims map.
 const ClaimsKey = "claims"
 
-var (
-	redisClient *redis.Client
-)
-
-func init() {
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "cache-redis:6379"
-	}
-	redisClient = redis.NewClient(&redis.Options{Addr: redisAddr})
-}
-
-// JWTMiddleware validates JWT tokens and extracts user information.
-// FIX: The function signature is now parameter-less as it initializes its own Redis client.
-func JWTMiddleware() gin.HandlerFunc {
+// JWTMiddleware memvalidasi token JWT dan mengekstrak informasi pengguna.
+// FIX: Menerima redis.Client sebagai parameter, menghilangkan kebutuhan akan init() global.
+func JWTMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -76,26 +61,28 @@ func JWTMiddleware() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
+
+			// Gunakan klien Redis yang disuntikkan
 			_, err := redisClient.Get(context.Background(), jti).Result()
-			if err != redis.Nil {
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not verify token with store"})
-					c.Abort()
-					return
-				}
+			if err == nil { // Jika tidak ada error, berarti key ditemukan (token dicabut)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Token has been revoked"})
 				c.Abort()
 				return
 			}
+			if err != redis.Nil { // Jika errornya BUKAN "key not found", berarti ada masalah server
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not verify token with store"})
+				c.Abort()
+				return
+			}
+			// Jika err == redis.Nil, lanjutkan (token valid)
+
 			if userID, exists := claims["sub"]; exists {
-				// FIX: Use the exported constant for the context key.
 				c.Set(UserIDKey, userID)
 			} else {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID (sub) not found in token claims"})
 				c.Abort()
 				return
 			}
-			// FIX: Use the exported constant for the context key.
 			c.Set(ClaimsKey, claims)
 		} else {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token or claims"})
@@ -107,9 +94,8 @@ func JWTMiddleware() gin.HandlerFunc {
 	}
 }
 
-// GetUserID extracts user ID from the Gin context after middleware validation.
+// GetUserID mengekstrak ID pengguna dari konteks Gin setelah validasi middleware.
 func GetUserID(c *gin.Context) (string, error) {
-	// FIX: Use the exported constant for the context key.
 	userID, exists := c.Get(UserIDKey)
 	if !exists {
 		return "", fmt.Errorf("user ID not found in context, middleware might be missing")
