@@ -6,6 +6,7 @@ import "time"
 // Ini aman untuk ditampilkan ke pengguna.
 type APIKeyMetadata struct {
 	ID          string     `json:"id"`
+	TenantID    string     `json:"tenant_id,omitempty"`
 	UserID      string     `json:"user_id"`
 	Prefix      string     `json:"prefix"`
 	Description string     `json:"description"`
