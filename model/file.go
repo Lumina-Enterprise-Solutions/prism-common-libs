@@ -4,6 +4,7 @@ import "time"
 
 type FileMetadata struct {
 	ID           string    `json:"id"`
+	TenantID     string    `json:"tenant_id,omitempty"`
 	OriginalName string    `json:"original_name"`
 	StoragePath  string    `json:"-"`
 	MimeType     string    `json:"mime_type"`

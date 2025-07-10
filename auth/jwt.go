@@ -13,8 +13,11 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const UserIDKey = "user_id"
-const ClaimsKey = "claims"
+const (
+	UserIDKey   = "user_id"
+	ClaimsKey   = "claims"
+	TenantIDKey = "tenant_id" // <-- BARU
+)
 
 // JWTMiddleware memvalidasi token JWT dan mengekstrak informasi pengguna.
 // FIX: Menerima redis.Client sebagai parameter, menghilangkan kebutuhan akan init() global.
@@ -83,6 +86,14 @@ func JWTMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
+			if tenantID, exists := claims["tid"]; exists {
+				c.Set(TenantIDKey, tenantID)
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Tenant ID (tid) not found in token claims"})
+				c.Abort()
+				return
+			}
+
 			c.Set(ClaimsKey, claims)
 		} else {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token or claims"})
@@ -103,6 +114,17 @@ func GetUserID(c *gin.Context) (string, error) {
 	idStr, ok := userID.(string)
 	if !ok {
 		return "", fmt.Errorf("user ID in context is not a string")
+	}
+	return idStr, nil
+}
+func GetTenantID(c *gin.Context) (string, error) {
+	tenantID, exists := c.Get(TenantIDKey)
+	if !exists {
+		return "", fmt.Errorf("tenant ID not found in context, middleware might be missing or misconfigured")
+	}
+	idStr, ok := tenantID.(string)
+	if !ok {
+		return "", fmt.Errorf("tenant ID in context is not a string")
 	}
 	return idStr, nil
 }
