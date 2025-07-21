@@ -1,4 +1,4 @@
-// File: prism-common-libs/auth/jwt.go
+// File: common/prism-common-libs/auth/jwt.go
 package auth
 
 import (
@@ -16,8 +16,36 @@ import (
 const (
 	UserIDKey   = "user_id"
 	ClaimsKey   = "claims"
-	TenantIDKey = "tenant_id" // <-- BARU
+	TenantIDKey = "tenant_id"
 )
+
+// GetTenantIDFromContext adalah helper yang digunakan oleh abstraksi DB untuk mendapatkan tenantID.
+func GetTenantIDFromContext(ctx context.Context) (string, error) {
+	// Gin context menggunakan Value, jadi kita ambil dari sana.
+	ginCtx, ok := ctx.(*gin.Context)
+	if ok {
+		val, exists := ginCtx.Get(TenantIDKey)
+		if !exists {
+			return "", fmt.Errorf("tenant ID tidak ditemukan di dalam gin context")
+		}
+		tenantID, ok := val.(string)
+		if !ok || tenantID == "" {
+			return "", fmt.Errorf("tenant ID di context bukan string atau kosong")
+		}
+		return tenantID, nil
+	}
+
+	// Fallback untuk non-gin context (misalnya, gRPC)
+	val := ctx.Value(TenantIDKey)
+	if val == nil {
+		return "", fmt.Errorf("tenant ID tidak ditemukan di dalam context")
+	}
+	tenantID, ok := val.(string)
+	if !ok || tenantID == "" {
+		return "", fmt.Errorf("tenant ID di context bukan string atau kosong")
+	}
+	return tenantID, nil
+}
 
 // JWTMiddleware memvalidasi token JWT dan mengekstrak informasi pengguna.
 // FIX: Menerima redis.Client sebagai parameter, menghilangkan kebutuhan akan init() global.
@@ -117,6 +145,7 @@ func GetUserID(c *gin.Context) (string, error) {
 	}
 	return idStr, nil
 }
+
 func GetTenantID(c *gin.Context) (string, error) {
 	tenantID, exists := c.Get(TenantIDKey)
 	if !exists {
